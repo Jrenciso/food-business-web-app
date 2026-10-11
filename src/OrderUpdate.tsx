@@ -1,0 +1,49 @@
+import { useRef, useState } from 'react';
+import { Download, X } from 'lucide-react';
+import { toBlob } from 'html-to-image';
+import { useApp } from './AppContext';
+import { balance, collected, dateTime, money, paymentState } from './data';
+import type { Order } from './types';
+
+const message=(order:Order)=>({
+ New:'Your order is received and queued.',
+ Preparing:'Your order is being prepared.',
+ Ready:order.type==='pickup'?'Your order is ready for pickup.':'Your order is ready for dispatch.',
+ 'Picked up':order.type==='pickup'?'Your pickup order has been handed over.':'Your order has been picked up for delivery.',
+ 'Out for delivery':'Your order is on its way.',
+ Completed:'Your order is complete. Thank you!',
+ Cancelled:'This order has been cancelled.'
+})[order.status];
+
+export default function OrderUpdate({order,onClose}:{order:Order;onClose:()=>void}){
+ const {data,notify}=useApp(),settings=data.settings,card=useRef<HTMLDivElement>(null),[busy,setBusy]=useState(false);
+ const currency=settings.currency,payment=paymentState(order);
+ const download=async()=>{
+  if(!card.current)return;
+  setBusy(true);
+  try{
+   await document.fonts.ready;
+   await Promise.all(Array.from(card.current.querySelectorAll('img')).map(img=>img.decode().catch(()=>undefined)));
+   const blob=await toBlob(card.current,{backgroundColor:'#fffdf8',pixelRatio:2,cacheBust:true,canvasWidth:card.current.scrollWidth,canvasHeight:card.current.scrollHeight});
+   if(!blob)throw Error('Empty image');
+   const url=URL.createObjectURL(blob),link=document.createElement('a');
+   link.href=url;link.download=`order-update-${order.number}.png`;
+   document.body.appendChild(link);link.click();link.remove();
+   window.setTimeout(()=>URL.revokeObjectURL(url),30000);
+   notify(`Order update #${order.number} downloaded`);
+  }catch{notify('Could not download the order update. Check the business logo and try again.','error')}
+  finally{setBusy(false)}
+ };
+ return <div className="modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}><div className="modal update-modal"><div className="modal-head"><h2>Customer order update</h2><button className="icon-btn" aria-label="Close" onClick={onClose}><X/></button></div>
+ <div className="order-update-card" ref={card}>
+  <div className="update-brand">{settings.logo?<img src={settings.logo} alt="Business logo"/>:<span>✦</span>}<div><strong>{settings.businessName}</strong>{settings.tagline&&<small>{settings.tagline}</small>}</div></div>
+  {order.sample&&<span className="sample-tag">SAMPLE / TEST</span>}
+  <div className="update-kicker">ORDER UPDATE</div><h2>Ticket #{order.number}</h2>
+  <div className="update-status">{order.status}</div><p>{message(order)}</p>
+  <div className="update-details"><div><span>Order type</span><strong>{order.type}</strong></div>{order.type==='delivery'&&<div><span>Delivery area</span><strong>{order.deliveryAreaLabel||'Not specified'}</strong></div>}<div><span>Updated</span><strong>{dateTime(order.statusHistory[order.statusHistory.length-1]?.at||order.createdAt,settings.timezone)}</strong></div></div>
+  <section className="update-items" aria-label="Items ordered"><h3>Items ordered</h3>{order.lines.map((line,index)=><div className="update-item" key={`${line.itemId}-${index}`}><div><strong>{line.quantity}× {line.name}</strong>{line.flavors?.length?<small>Flavors: {line.flavors.join(', ')}</small>:null}</div><b>{money(line.unitPrice*line.quantity,currency)}</b></div>)}</section>
+  <div className="update-totals"><div><span>Subtotal</span><strong>{money(order.subtotal,currency)}</strong></div>{order.discount>0&&<div><span>Discount</span><strong>−{money(order.discount,currency)}</strong></div>}{order.type==='delivery'&&<div><span>Delivery fee</span><strong>{money(order.deliveryFee,currency)}</strong></div>}<div className="update-grand-total"><span>Total</span><strong>{money(order.total,currency)}</strong></div></div>
+  <div className="update-payment"><div><span>Payment status</span><span className={`payment-badge ${payment.toLowerCase().replaceAll(' ','-')}`}>{payment.toUpperCase()}</span></div><div><span>Amount collected</span><strong>{money(collected(order),currency)}</strong></div><div><span>Remaining balance</span><strong>{money(balance(order),currency)}</strong></div></div>
+  <footer>Thank you for choosing {settings.businessName}.</footer>
+ </div><div className="modal-actions"><button className="outline" onClick={onClose}>Close</button><button className="primary" onClick={download} disabled={busy}><Download size={17}/>{busy?'Preparing image…':'Download PNG'}</button></div></div></div>
+}
