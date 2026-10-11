@@ -24,9 +24,9 @@ export function makeTestAttendance(data:Database,from:string):Attendance[]{
  return data.team.filter(e=>e.active).flatMap((employee,index)=>{
   const pattern=patterns[index%patterns.length],off=offDays[index%offDays.length],shift=shifts[index%shifts.length];
   return [...pattern,off].sort((a,b)=>a-b).map(day=>{
-   const date=addDays(from,day),worked=day!==off,rate=worked?savedRate(employee,date):null;
+   const date=addDays(from,day),worked=day!==off,rate=worked?savedRate(employee,date):null,matchedShift=worked?data.workShifts?.find(s=>s.active&&s.start===shift[0]&&s.end===shift[1]):undefined;
    const notes=worked&&day===pattern[0]?(rate&&index%2===0?'TEST ATTENDANCE DATA · example shift':!rate?'TEST ATTENDANCE DATA · no valid saved rate; owner review needed':''):'';
-   return {id:uid(),employeeId:employee.id,date,worked,start:worked?shift[0]:'',end:worked?shift[1]:'',notes,updatedAt:at,rateSnapshot:rate,revisions:[{at,summary:'TEST ATTENDANCE DATA created for payroll practice'}],testData:true};
+   return {id:uid(),employeeId:employee.id,date,worked,start:worked?shift[0]:'',end:worked?shift[1]:'',notes,updatedAt:at,rateSnapshot:rate,shiftId:matchedShift?.id,shiftName:matchedShift?.name,revisions:[{at,summary:'TEST ATTENDANCE DATA created for payroll practice'}],testData:true};
   });
  });
 }

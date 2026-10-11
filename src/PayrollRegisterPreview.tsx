@@ -19,9 +19,10 @@ export default function PayrollRegisterPreview({rows,includedIds,from,to,currenc
  for(const row of included){total.base+=row.base;total.additions+=row.additions;total.deductions+=row.deductions;total.net+=row.net}
  return <>
   <div className="surface payroll-controls">
-   <h3>3 · Payroll register</h3>
-   <p className="muted"><strong>{from} to {to}</strong> · Asia/Manila business dates · {included.length} of {rows.length} employees included</p>
-   <p className="muted">Generating reserves these work dates. They become paid only when each employee’s payment is recorded.</p>
+   <small className="muted">3 · Payroll register</small>
+   <h2 className="payroll-period-heading">{from} to {to}</h2>
+   <p className="muted">Asia/Manila business dates · {included.length} of {rows.length} employees included</p>
+   <p className="muted payroll-review-helper">Review before saving. The calculation is fixed when saved; payment is tracked separately.</p>
    <button className="outline small" onClick={onBack}><ArrowLeft size={15}/> Back to adjustments</button>
   </div>
   <div className="surface payroll-roster payroll-register-preview">
@@ -32,7 +33,7 @@ export default function PayrollRegisterPreview({rows,includedIds,from,to,currenc
      <td data-label="Base pay">{money(row.base,currency)}</td><td data-label="Earnings">{money(row.additions,currency)}</td><td data-label="Deductions">{money(row.deductions,currency)}</td><td data-label="Projected net"><strong>{money(row.net,currency)}</strong></td>
     </tr>})}
    </tbody><tfoot><tr><th>Total · {included.length} employees</th><td data-label="Base pay">{money(total.base,currency)}</td><td data-label="Earnings">{money(total.additions,currency)}</td><td data-label="Deductions">{money(total.deductions,currency)}</td><td data-label="Projected net"><strong>{money(total.net,currency)}</strong></td></tr></tfoot></table></div>
-   <div className="report-actions"><span className="muted">{included.length} included · Net = base + earnings − deductions</span><button className="primary" onClick={onGenerate} disabled={!included.length||included.some(row=>row.net<0)}>Generate payroll batch</button></div>
+   <div className="report-actions"><span className="muted">{included.length} included · Net = base + earnings − deductions</span><button className="primary" onClick={onGenerate} disabled={!included.length||included.some(row=>row.net<0)}>Save payroll register</button></div>
   </div>
  </>
 }

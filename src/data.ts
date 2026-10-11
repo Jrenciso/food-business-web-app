@@ -1,6 +1,7 @@
-import type { Attendance, Database, DeliveryArea, Item, Order, PayBasis, PayrollBatch, PayrollBatchAdjustment, PayrollBatchRow, PayrollRun, RateVersion, Role, TeamMember } from './types';
+import type { Attendance, Database, DeliveryArea, Item, Order, PayBasis, PayrollBatch, PayrollBatchAdjustment, PayrollBatchRow, PayrollRun, RateVersion, Role, TeamMember, WorkShift } from './types';
 import { urbanMenu } from './urbanSeed';
 import { nextOrderStatuses, orderEditUnavailableReason } from './orderRules';
+import { activePaymentMethods, defaultPaymentMethods } from './paymentMethods';
 export const uid=()=>crypto.randomUUID();
 export const money=(n:number,currency='PHP')=>new Intl.NumberFormat('en-PH',{style:'currency',currency}).format(n/100);
 export const businessDay=(value:string|Date,timezone='Asia/Manila')=>new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
@@ -25,7 +26,7 @@ export const finalizedRun=(d:Database,employeeId:string,date:string)=>d.payrollR
 export const payrollAssignment=(d:Database,employeeId:string,date:string)=>d.payrollBatches?.flatMap(batch=>batch.status==='generated'?batch.rows.map(row=>({batch,row})):[]).find(x=>x.row.employeeId===employeeId&&x.row.lines.some(line=>line.date===date));
 export const availablePayrollAdjustments=(d:Database,employeeId:string,from:string,to:string):PayrollBatchAdjustment[]=>d.adjustments.filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to&&!a.batchId&&!a.voidedAt).map(a=>({id:a.id,amount:a.amount,reason:a.reason,category:a.category||'Manual adjustment',date:a.date}));
 export function preparePayrollRow(d:Database,employee:TeamMember,from:string,to:string,adjustments:PayrollBatchAdjustment[]=[]):PayrollBatchRow{
- const lines=d.attendance.filter(a=>a.employeeId===employee.id&&a.date>=from&&a.date<=to&&a.worked&&!attendanceTimeError(true,a.start,a.end)&&a.rateSnapshot&&Number.isSafeInteger(a.rateSnapshot.amount)&&a.rateSnapshot.amount>0&&!payrollAssignment(d,employee.id,a.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(a=>({attendanceId:a.id,date:a.date,start:a.start,end:a.end,basis:a.rateSnapshot!.basis,rate:a.rateSnapshot!.amount,accrual:attendanceCost(a)}));
+ const lines=d.attendance.filter(a=>a.employeeId===employee.id&&a.date>=from&&a.date<=to&&a.worked&&!attendanceTimeError(true,a.start,a.end)&&a.rateSnapshot&&Number.isSafeInteger(a.rateSnapshot.amount)&&a.rateSnapshot.amount>0&&!payrollAssignment(d,employee.id,a.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(a=>({attendanceId:a.id,date:a.date,start:a.start,end:a.end,basis:a.rateSnapshot!.basis,rate:a.rateSnapshot!.amount,accrual:attendanceCost(a),shiftName:a.shiftName}));
  const base=lines.reduce((n,l)=>n+l.accrual,0),additions=adjustments.filter(a=>a.amount>0).reduce((n,a)=>n+a.amount,0),deductions=adjustments.filter(a=>a.amount<0).reduce((n,a)=>n-a.amount,0);
  return {employeeId:employee.id,employeeName:employee.name,role:employee.title||employee.role,lines,adjustments,base,additions,deductions,net:base+additions-deductions,payment:null};
 }
@@ -42,7 +43,8 @@ function migratePayrollRuns(d:Database):PayrollBatch[]{
 export const deliveryAreaSeed=():DeliveryArea[]=>[
  ['sonoma','Sonoma',8000],['amaia','Amaia / Phirst Park Pandi',9000],['brighthomes','Brighthomes / Primeville / EPDR / Calle, Malabon / Caysio Pabahay / Caypombo',4000],['pintong','Pintong Bato / Malawak / Sunrays / Villa Corazon',4000],['msapa','M. Sapa',6000]
 ].map(([id,label,fee],order)=>({id:String(id),label:String(label),fee:Number(fee),aliases:'',notes:'',active:true,order}));
-export function seed():Database{const menu=urbanMenu(),today=businessDay(new Date());const team:TeamMember[]=[['owner1','Alex Reyes','owner',0,'monthly'],['chef1','Sam Dela Cruz','chef',90000,'daily'],['kitchen1','Jo Lim','kitchen',65000,'daily'],['rider1','Nico Ramos','rider',55000,'daily']].map(([id,name,role,amount,basis])=>({id:String(id),name:String(name),contact:'',role:role as Role,title:'',active:true,activeFrom:today,activeTo:'',notes:'',rates:[{id:uid(),amount:Number(amount),basis:basis as PayBasis,effectiveDate:today,recordedAt:new Date().toISOString()}]}));return {...menu,items:menu.items.map((i,n)=>({...i,order:i.order??n,favorite:false})),orders:[],team,attendance:[],adjustments:[],payrollRuns:[],payrollBatches:[],payrollDraft:null,deliveryAreas:deliveryAreaSeed(),activity:[],settings:{businessName:'Urban Casero',tagline:'One-Stop Snackshop',logo:'',phone:'',address:'',currency:'PHP',timezone:'Asia/Manila',footer:'Thank you for ordering!',defaultDeliveryFee:4500,accent:'#be7934',theme:'light',activeUserId:'owner1',dataMode:'sample',tileSizes:{}},nextTicket:1001}}
+export const workShiftSeed=():WorkShift[]=>[['opening','Opening','08:30','16:30'],['kitchen','Kitchen','09:00','17:00'],['midday','Midday','10:00','18:00'],['rider','Rider','11:00','19:00'],['afternoon','Afternoon','13:00','22:00']].map(([id,name,start,end],order)=>({id,name,start,end,active:true,order}));
+export function seed():Database{const menu=urbanMenu(),today=businessDay(new Date());const team:TeamMember[]=[['owner1','Alex Reyes','owner',0,'monthly'],['chef1','Sam Dela Cruz','chef',90000,'daily'],['kitchen1','Jo Lim','kitchen',65000,'daily'],['rider1','Nico Ramos','rider',55000,'daily']].map(([id,name,role,amount,basis])=>({id:String(id),name:String(name),contact:'',role:role as Role,title:'',active:true,activeFrom:today,activeTo:'',notes:'',rates:[{id:uid(),amount:Number(amount),basis:basis as PayBasis,effectiveDate:today,recordedAt:new Date().toISOString()}]}));return {...menu,items:menu.items.map((i,n)=>({...i,order:i.order??n,favorite:false})),orders:[],team,attendance:[],adjustments:[],payrollRuns:[],payrollBatches:[],payrollDraft:null,deliveryAreas:deliveryAreaSeed(),workShifts:workShiftSeed(),activity:[],settings:{businessName:'Urban Casero',tagline:'One-Stop Snackshop',logo:'',phone:'',address:'',currency:'PHP',timezone:'Asia/Manila',footer:'Thank you for ordering!',defaultDeliveryFee:4500,accent:'#be7934',theme:'light',activeUserId:'owner1',dataMode:'sample',tileSizes:{},payrollSchedule:'weekly',payrollCutoff:15,paymentMethods:defaultPaymentMethods()},nextTicket:1001}}
 export function archiveSampleLabor(d:Database){if(!d.attendance.length&&!d.adjustments.length&&!d.payrollRuns.length&&!d.payrollBatches?.length)return;d.sampleLaborArchive=[...(d.sampleLaborArchive||[]),{at:new Date().toISOString(),attendance:d.attendance,adjustments:d.adjustments,payrollRuns:d.payrollRuns,payrollBatches:d.payrollBatches||[]}];d.attendance=[];d.adjustments=[];d.payrollRuns=[];d.payrollBatches=[];d.payrollDraft=null}
 const LEGACY_KEY='urban-ops-v1',OLD_KEY='salo-counter-v2',workspaceKey=(w:'sample'|'live')=>`urban-ops-workspace-${w}-v1`;
 export const activeWorkspace=()=>localStorage.getItem('urban-ops-active-workspace')==='live'?'live' as const:'sample' as const;
@@ -67,7 +69,11 @@ function validateOperationalMutation(before:Database,after:Database,actor:TeamMe
    if(!previous||JSON.stringify(previous)!==JSON.stringify(record)){
     const error=attendanceTimeError(record.worked,record.start,record.end);
     if(error)throw Error(error);
-    if(record.worked&&!record.rateSnapshot)throw Error('A pay rate snapshot is required for a worked day.');
+    if(record.worked&&!record.rateSnapshot&&!previous)throw Error('A pay rate is required for a new worked day.');
+    if(record.worked&&record.shiftId&&(!previous||previous.shiftId!==record.shiftId||previous.start!==record.start||previous.end!==record.end)){
+     const shift=after.workShifts?.find(s=>s.id===record.shiftId&&s.active);
+     if(!shift||shift.name!==record.shiftName||shift.start!==record.start||shift.end!==record.end)throw Error('Choose an active work shift for this log.');
+    }
     if(payrollAssignment(before,record.employeeId,record.date))throw Error('This work date is in a payroll batch. Void the unpaid batch before correcting attendance.');
    }
   }
@@ -77,7 +83,7 @@ function validateOperationalMutation(before:Database,after:Database,actor:TeamMe
   for(const old of oldBatches){
    const current=newBatches.find(b=>b.id===old.id);
    if(!current)throw Error('Payroll history cannot be deleted.');
-   const withoutPayment=(batch:PayrollBatch)=>JSON.stringify({...batch,rows:batch.rows.map(row=>({...row,payment:null})),status:undefined,voidedAt:undefined});
+   const withoutPayment=(batch:PayrollBatch)=>JSON.stringify({...batch,rows:batch.rows.map(row=>({...row,payment:null,paymentHistory:undefined})),status:undefined,voidedAt:undefined});
    if(withoutPayment(old)!==withoutPayment(current))throw Error('Generated payroll calculations cannot be edited.');
    if(old.status==='void'&&JSON.stringify(old)!==JSON.stringify(current))throw Error('Voided payroll batches cannot be changed.');
    if(current.status==='void'){
@@ -87,9 +93,13 @@ function validateOperationalMutation(before:Database,after:Database,actor:TeamMe
    for(const oldRow of old.rows){
     const row=current.rows.find(r=>r.employeeId===oldRow.employeeId);
     if(!row)throw Error('Payroll employee row is missing.');
-    if(oldRow.payment&&JSON.stringify(oldRow.payment)!==JSON.stringify(row.payment))throw Error('Recorded payroll payments cannot be changed or repeated.');
+    const oldHistory=oldRow.paymentHistory||[],newHistory=row.paymentHistory||[];
+    if(oldRow.payment&&!row.payment){if(newHistory.length!==oldHistory.length+1||JSON.stringify(newHistory.slice(0,-1))!==JSON.stringify(oldHistory)||JSON.stringify(newHistory[newHistory.length-1])!==JSON.stringify(oldRow.payment))throw Error('A payment correction must retain the prior payment record.');}
+    else if(oldRow.payment&&JSON.stringify(oldRow.payment)!==JSON.stringify(row.payment))throw Error('Recorded payroll payments cannot be changed or repeated.');
+    else if(JSON.stringify(oldHistory)!==JSON.stringify(newHistory))throw Error('Payroll payment history cannot be changed.');
     if(!oldRow.payment&&row.payment){
-     if(current.status!=='generated'||row.net<0||row.payment.amount!==row.net||!Number.isFinite(Date.parse(row.payment.at))||!/^\d{4}-\d{2}-\d{2}$/.test(row.payment.date)||!['cash','bank transfer','e-wallet','other'].includes(row.payment.method))throw Error('Invalid payroll payment.');
+     if(current.status!=='generated'||row.net<0||row.payment.amount!==row.net||!Number.isFinite(Date.parse(row.payment.at))||!/^\d{4}-\d{2}-\d{2}$/.test(row.payment.date)||!Number.isFinite(Date.parse(`${row.payment.date}T12:00:00Z`)))throw Error('Invalid payroll payment.');
+     if(row.payment.method&&!activePaymentMethods(after.settings).some(m=>m.id===row.payment!.method&&m.label===row.payment!.methodLabel))throw Error('Choose an enabled payroll payment method.');
     }
    }
   }
@@ -108,7 +118,7 @@ function validateOperationalMutation(before:Database,after:Database,actor:TeamMe
      allocated.set(key,batch);
      if(!oldBatches.some(b=>b.id===batch.id)){
       const attendance=after.attendance.find(a=>a.employeeId===row.employeeId&&a.date===line.date&&a.id===line.attendanceId);
-      if(!attendance?.worked||attendanceTimeError(true,attendance.start,attendance.end)||!attendance.rateSnapshot||line.date<batch.from||line.date>batch.to||line.accrual!==attendanceCost(attendance)||line.rate!==attendance.rateSnapshot.amount||line.basis!==attendance.rateSnapshot.basis||line.start!==attendance.start||line.end!==attendance.end)throw Error('Payroll batch contains an invalid time log.');
+      if(!attendance?.worked||attendanceTimeError(true,attendance.start,attendance.end)||!attendance.rateSnapshot||line.date<batch.from||line.date>batch.to||line.accrual!==attendanceCost(attendance)||line.rate!==attendance.rateSnapshot.amount||line.basis!==attendance.rateSnapshot.basis||line.start!==attendance.start||line.end!==attendance.end||line.shiftName!==attendance.shiftName)throw Error('Payroll batch contains an invalid time log.');
      }
     }
     const base=row.lines.reduce((n,l)=>n+l.accrual,0),additions=row.adjustments.filter(a=>a.amount>0).reduce((n,a)=>n+a.amount,0),deductions=row.adjustments.filter(a=>a.amount<0).reduce((n,a)=>n-a.amount,0);
@@ -139,6 +149,15 @@ function validateOperationalMutation(before:Database,after:Database,actor:TeamMe
    if(!Number.isSafeInteger(adjustment.amount)||!adjustment.amount||!adjustment.reason.trim()||!adjustment.date)throw Error('Adjustment requires a valid nonzero amount, date, and reason.');
   }
  }
+ if(action==='settings'){
+  const methods=after.settings.paymentMethods||[],methodIds=new Set<string>(),methodLabels=new Set<string>();
+  for(const original of before.settings.paymentMethods||[])if(!methods.some(m=>m.id===original.id))throw Error('Disable a payment method instead of deleting it.');
+  for(const method of methods){const label=method.label.trim().toLowerCase();if(!method.id||!label||methodIds.has(method.id)||methodLabels.has(label)||!Number.isSafeInteger(method.order))throw Error('Payment methods need unique names and valid order.');methodIds.add(method.id);methodLabels.add(label)}
+  const shifts=after.workShifts||[],ids=new Set<string>(),names=new Set<string>();
+  for(const old of before.workShifts||[])if(!shifts.some(s=>s.id===old.id))throw Error('Deactivate a work shift instead of deleting it.');
+  for(const shift of shifts){const name=shift.name.trim().toLowerCase();if(!name||ids.has(shift.id)||names.has(name)||attendanceTimeError(true,shift.start,shift.end)||!Number.isSafeInteger(shift.order))throw Error('Each work shift needs a unique name and valid same-day hours.');ids.add(shift.id);names.add(name)}
+  if(!['weekly','twice-monthly','monthly'].includes(after.settings.payrollSchedule||'weekly')||!Number.isInteger(after.settings.payrollCutoff)||after.settings.payrollCutoff!<1||after.settings.payrollCutoff!>27)throw Error('Choose a valid payroll schedule and cut-off day.');
+ }
  if(action==='pos'){
   for(const original of before.orders){
    const current=after.orders.find(o=>o.id===original.id);
@@ -148,6 +167,7 @@ function validateOperationalMutation(before:Database,after:Database,actor:TeamMe
    }
   }
  }
+ if(action==='payment')for(const original of before.orders){const current=after.orders.find(o=>o.id===original.id);if(!current)throw Error('Order payment history cannot be deleted.');if(JSON.stringify(current.payments.slice(0,original.payments.length))!==JSON.stringify(original.payments))throw Error('Existing payment records cannot be changed.');for(const payment of current.payments.slice(original.payments.length))if(payment.kind==='payment'&&!activePaymentMethods(after.settings).some(m=>m.id===payment.method&&m.label===payment.methodLabel))throw Error('Choose an enabled payment method.');}
  if(actor.role==='owner'){
   if(action==='cancel')for(const original of before.orders){
    const current=after.orders.find(o=>o.id===original.id);
@@ -200,10 +220,11 @@ export const db={load(workspace:'sample'|'live'=activeWorkspace()):Database{
   if(!raw&&workspace==='live')fresh={...fresh,orders:[],attendance:[],adjustments:[],payrollRuns:[],payrollBatches:[],payrollDraft:null,activity:[],nextTicket:1001};
  }
  fresh.deliveryAreas??=deliveryAreaSeed();fresh.activity??=[];
+ fresh.workShifts??=workShiftSeed();
  fresh.payrollBatches??=migratePayrollRuns(fresh);
  fresh.payrollDraft??=null;
  fresh.items=fresh.items.map((i,n)=>({...i,order:i.order??n,favorite:i.favorite??false}));
- fresh.settings.tileSizes??={};fresh.settings.dataMode=workspace;
+ fresh.settings.tileSizes??={};fresh.settings.payrollSchedule??='weekly';fresh.settings.payrollCutoff??=15;fresh.settings.paymentMethods??=defaultPaymentMethods();fresh.settings.dataMode=workspace;
  this.save(fresh);return fresh
-},save(data:Database){localStorage.setItem(workspaceKey(data.settings.dataMode),JSON.stringify(data))},mutate(data:Database,role:Role,action:Parameters<typeof can>[1],fn:(draft:Database)=>void,actor:TeamMember){if(!can(role,action)){throw Error('Role is not allowed to perform this action')}const draft=structuredClone(data);fn(draft);validateOperationalMutation(data,draft,actor,action);this.save(draft);return draft},resetSampleMenu(data:Database){const draft=structuredClone(data);const menu=urbanMenu();draft.categories=menu.categories;draft.items=menu.items;this.save(draft);return draft},clearSampleOrders(data:Database){const draft=structuredClone(data);draft.orders=draft.orders.filter(o=>!o.sample);this.save(draft);return draft}};
+},save(data:Database){localStorage.setItem(workspaceKey(data.settings.dataMode),JSON.stringify(data))},prepareMutation(data:Database,role:Role,action:Parameters<typeof can>[1],fn:(draft:Database)=>void,actor:TeamMember){if(!can(role,action)){throw Error('Role is not allowed to perform this action')}const draft=structuredClone(data);fn(draft);validateOperationalMutation(data,draft,actor,action);return draft},mutate(data:Database,role:Role,action:Parameters<typeof can>[1],fn:(draft:Database)=>void,actor:TeamMember){const draft=this.prepareMutation(data,role,action,fn,actor);this.save(draft);return draft},resetSampleMenu(data:Database){const draft=structuredClone(data);const menu=urbanMenu();draft.categories=menu.categories;draft.items=menu.items;this.save(draft);return draft},clearSampleOrders(data:Database){const draft=structuredClone(data);draft.orders=draft.orders.filter(o=>!o.sample);this.save(draft);return draft}};
 
