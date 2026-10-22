@@ -88,7 +88,7 @@ function CloudProvider({children,onSwitch}:{children:React.ReactNode;onSwitch:(m
    else{pendingRef.current=operation;setSaveState('error');notify(`Save unconfirmed: ${message}. Use Retry pending save before submitting again.`,'error')}
    return false;
   }finally{busyRef.current=false}};
- const commit:State['commit']=async(action,fn,access)=>{if(action==='test-data'){notify('Bulk test orders are available only in the local Sample / Test workspace.','error');return false}if(!signedIn||!snapshotRef.current){notify('Sign in to continue.','error');return false}
+ const commit:State['commit']=async(action,fn,access)=>{if(!signedIn||!snapshotRef.current){notify('Sign in to continue.','error');return false}
   if(pendingRef.current||busyRef.current){notify('A save is pending. Retry it before making another change.','error');return false}
   try{const current=snapshotRef.current;const actor={...user,id:current.employeeId||user.id,role:current.role};
    const next=db.prepareMutation(current.data,current.role,action,fn,actor);

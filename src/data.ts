@@ -9,7 +9,7 @@ export const dateTime=(value:string,timezone='Asia/Manila')=>new Intl.DateTimeFo
 export const balance=(o:Order)=>Math.max(0,o.total-collected(o));
 export const collected=(o:Order)=>o.payments.reduce((a,p)=>a+(p.kind==='payment'?p.amount:-p.amount),0);
 export const paymentState=(o:Order)=>{const paid=o.payments.filter(p=>p.kind==='payment').reduce((a,p)=>a+p.amount,0),refunded=o.payments.filter(p=>p.kind==='refund').reduce((a,p)=>a+p.amount,0);return refunded>0&&refunded===paid?'Refunded':collected(o)>=o.total?'Paid':collected(o)>0?'Partially paid':'Unpaid'};
-export const can=(role:Role,action:'pos'|'menu'|'settings'|'reports'|'payment'|'cancel'|'prep'|'deliver'|'staff'|'attendance'|'payroll'|'test-data')=>role==='owner'||(action==='pos'&&(role==='chef'||role==='kitchen'))||(action==='prep'&&(role==='chef'||role==='kitchen'))||(action==='deliver'&&role==='rider');
+export const can=(role:Role,action:'pos'|'menu'|'settings'|'reports'|'payment'|'cancel'|'prep'|'deliver'|'staff'|'attendance'|'payroll')=>role==='owner'||(action==='pos'&&(role==='chef'||role==='kitchen'))||(action==='prep'&&(role==='chef'||role==='kitchen'))||(action==='deliver'&&role==='rider');
 export const rateAt=(employee:TeamMember,date:string):RateVersion|null=>[...employee.rates].filter(r=>r.effectiveDate<=date).sort((a,b)=>b.effectiveDate.localeCompare(a.effectiveDate)||b.recordedAt.localeCompare(a.recordedAt))[0]||null;
 export const monthDays=(date:string)=>{const [y,m]=date.split('-').map(Number);return new Date(y,m,0).getDate()};
 export const accrued=(rate:RateVersion|null,date:string)=>{if(!rate)return 0;if(rate.basis==='daily')return rate.amount;const days=monthDays(date),base=Math.floor(rate.amount/days),remainder=rate.amount-base*days;return base+(Number(date.slice(8))<=remainder?1:0)};
@@ -58,71 +58,6 @@ const validStatusAdvance=(before:Order,after:Order)=>{
   (!previous||Date.parse(latest.at)>Date.parse(previous.at));
 };
 function validateOperationalMutation(before:Database,after:Database,actor:TeamMember,action:Parameters<typeof can>[1]){
- if(action==='test-data'){
-  if(actor.role!=='owner'||before.settings.dataMode!=='sample'||after.settings.dataMode!=='sample')throw Error('Bulk test orders can only be changed in the Sample / Test workspace.');
-  const withoutOrders=(data:Database)=>JSON.stringify({...data,orders:[],nextTicket:0});
-  if(withoutOrders(before)!==withoutOrders(after))throw Error('Bulk test data cannot change other workspace records.');
-  const oldById=new Map(before.orders.map(order=>[order.id,order])),newById=new Map(after.orders.map(order=>[order.id,order]));
-  const added=after.orders.filter(order=>!oldById.has(order.id));
-  for(const prior of before.orders){
-   const current=newById.get(prior.id);
-   if(!current&&prior.testData!=='bulk-order-generator')throw Error('Only generated bulk test orders can be removed.');
-   if(current&&JSON.stringify(current)!==JSON.stringify(prior))throw Error('Existing orders cannot be edited by the bulk test-data tool.');
-  }
-  if(added.some(order=>order.testData!=='bulk-order-generator'||!order.sample))throw Error('Only marked test orders can be added by this tool.');
-  const ids=new Set(before.orders.map(order=>order.id)),numbers=new Set(before.orders.map(order=>order.number)),paymentIds=new Set(before.orders.flatMap(order=>order.payments.map(payment=>payment.id)));
-  for(const order of added){
-   if(!order.id||ids.has(order.id)||!order.number||numbers.has(order.number))throw Error('Order IDs and ticket numbers must be unique.');
-   ids.add(order.id);numbers.add(order.number);
-   for(const payment of order.payments){if(!payment.id||paymentIds.has(payment.id))throw Error('Payment IDs must be unique.');paymentIds.add(payment.id)}
-  }
-  if(added.length){
-   const beforeMax=Math.max(0,...before.orders.map(order=>Number(order.number)).filter(Number.isSafeInteger));
-   const firstTicket=Math.max(before.nextTicket,beforeMax+1);
-   if(after.nextTicket!==firstTicket+added.length)throw Error('Generated ticket numbering is inconsistent.');
-   const expectedNumbers=new Set(Array.from({length:added.length},(_,index)=>String(firstTicket+index)));
-   if(added.some(order=>!expectedNumbers.has(order.number))||expectedNumbers.size!==added.length)throw Error('Generated ticket numbers are inconsistent.');
-  }else if(after.nextTicket!==before.nextTicket)throw Error('Removing test orders cannot rewind ticket numbers.');
-  const enabled=after.settings.newOrderDisplay?.enabledOrderTypes||['pickup','take-out','delivery','dine-in'],supported=['pickup','take-out','delivery','dine-in'];
-  const methods=activePaymentMethods(after.settings);
-  const generated=after.orders.filter(order=>order.testData==='bulk-order-generator');
-  for(const order of added){
-   if(!supported.includes(order.type)||!enabled.includes(order.type))throw Error('A disabled or unsupported order type cannot be generated.');
-   if(!order.id.startsWith('bulk-test-')||!order.customer.startsWith('TEST-')||!order.contact.startsWith('TEST-')||!order.notes.includes('TEST FIXTURE'))throw Error('Test tickets need clear synthetic labels.');
-   const created=Date.parse(order.createdAt);
-   if(!Number.isFinite(created)||!order.lines.length||order.statusHistory[0]?.status!=='New'||order.statusHistory[order.statusHistory.length-1]?.status!==order.status)throw Error('Generated order details or status history are invalid.');
-   const itemSubtotal=order.lines.reduce((total,line)=>{
-    const item=after.items.find(candidate=>candidate.id===line.itemId&&candidate.available);
-    if(!item||line.name!==item.name||line.unitPrice!==item.price||!Number.isSafeInteger(line.quantity)||line.quantity<1||line.quantity>3)throw Error('Generated order line does not match the available menu.');
-    if(item.flavorCount){if(!line.flavors||line.flavors.length!==item.flavorCount||new Set(line.flavors).size!==line.flavors.length)throw Error('Generated menu flavors are invalid.');}
-    else if(line.flavors?.length)throw Error('This menu item does not support flavors.');
-    return total+line.unitPrice*line.quantity;
-   },0);
-   if(itemSubtotal!==order.subtotal||order.discount<0||order.deliveryFee<0||order.total!==order.subtotal+order.deliveryFee-order.discount||order.discount>order.subtotal+order.deliveryFee)throw Error('Generated order totals do not reconcile.');
-   if(order.type==='delivery'){
-    const area=after.deliveryAreas.find(candidate=>candidate.id===order.deliveryAreaId&&candidate.active);
-    if(!area||area.label!==order.deliveryAreaLabel||area.fee!==order.deliveryAreaFee||order.deliveryFee!==area.fee||!order.address.startsWith('TEST DELIVERY')||!after.team.some(member=>member.id===order.riderId&&member.role==='rider'&&member.active))throw Error('Generated delivery details are invalid.');
-   }else if(order.deliveryFee||order.deliveryAreaId||order.deliveryAreaLabel||order.deliveryAreaFee||order.deliveryFeeOverrideReason||order.riderId||order.address||order.landmark)throw Error('Non-delivery test orders cannot contain delivery details.');
-   if(Date.parse(order.statusHistory[0].at)!==created)throw Error('The first status must match the order creation time.');
-   let history=order.statusHistory.slice(0,1),previousAt=created;
-   for(const event of order.statusHistory.slice(1)){
-    const at=Date.parse(event.at),previous={...order,status:history[history.length-1].status,statusHistory:history};
-    if(!Number.isFinite(at)||at<=previousAt)throw Error('Generated status timestamps must move forward.');
-    if(!nextOrderStatuses(previous,'owner',actor.id).includes(event.status))throw Error('Generated status history contains an invalid transition.');
-    history=[...history,event];previousAt=at;
-   }
-   if(order.status==='Cancelled'&&order.payments.length)throw Error('Cancelled test tickets must remain unpaid.');
-   let paid=0,priorPaymentAt=created;
-   for(const payment of order.payments){
-    const at=Date.parse(payment.at),method=methods.find(candidate=>candidate.id===payment.method&&candidate.label===payment.methodLabel);
-    if(payment.kind!=='payment'||!method||!Number.isSafeInteger(payment.amount)||payment.amount<=0||at<priorPaymentAt||payment.receivedByRole!=='owner'||!payment.reference.startsWith('TEST-REF-'))throw Error('Generated payment details are invalid.');
-    paid+=payment.amount;priorPaymentAt=at;
-   }
-   if(paid>order.total)throw Error('Generated payments cannot exceed the order total.');
-  }
-  if(generated.some(order=>!order.sample))throw Error('Generated fixtures must stay marked as sample data.');
-  return;
- }
  if(action==='attendance'){
   for(const original of before.attendance)if(!after.attendance.some(a=>a.id===original.id))throw Error('Attendance history cannot be deleted.');
   const keys=new Set<string>();
