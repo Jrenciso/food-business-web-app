@@ -72,7 +72,7 @@ function CloudProvider({children,onSwitch}:{children:React.ReactNode;onSwitch:(m
  useEffect(()=>{if(signedIn&&role!=='owner'&&page!=='orders')setPage('orders')},[signedIn,role,page]);
  useEffect(()=>{if(toast&&toast.kind!=='error'){const id=window.setTimeout(()=>setToast(t=>t?.id===toast.id?null:t),6000);return()=>clearTimeout(id)}},[toast]);
  const send=async(operation:PendingCloudWrite)=>{busyRef.current=true;setSaveState('saving');try{
-   const next=operation.access?await cloud.saveEmployeeAccess(businessId,operation.revision,operation.next,operation.requestId,operation.access.email,operation.access.role,operation.access.employeeId,operation.access.active):await cloud.apply(businessId,operation.revision,operation.action,operation.next,operation.requestId);
+   const next=operation.access?await cloud.saveEmployeeAccess(businessId,operation.revision,operation.next,operation.requestId,operation.access.email,operation.access.role,operation.access.employeeId,operation.access.active):operation.action==='pos'&&role!=='owner'?await cloud.staffOrder(businessId,operation.revision,operation.next,operation.requestId):await cloud.apply(businessId,operation.revision,operation.action,operation.next,operation.requestId);
    accept(next);pendingRef.current=null;notify(next.accessStatus==='pending'?'Employee saved. Ask them to create and confirm an account with this email.':next.accessStatus==='disabled'?'Employee saved; app access disabled.':next.accessStatus==='linked'?'Employee saved; app access linked.':'Saved to shared workspace');return true;
   }catch(e){const message=e instanceof Error?e.message:'Save did not reach the server.';
    const code=e&&typeof e==='object'&&'code' in e?String((e as {code?:unknown}).code||''):'';

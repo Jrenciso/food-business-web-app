@@ -11,7 +11,7 @@ The JSON workspace preserves historic menu prices, delivery fees, attendance rat
 ## Configure a Supabase project
 
 1. Create a Supabase project and enable email/password authentication. Create the owner account in Authentication.
-2. Back up the database and apply the SQL files in `supabase/migrations/` in numeric order. Existing projects should apply only migrations they have not yet run. The 20261022 migrations add staff accounts, rider session location, payment visibility, and the corrected role-aware ticket write/collection behavior; check that each completes without errors.
+2. Back up the database and apply the SQL files in `supabase/migrations/` in numeric order. Existing projects should apply only migrations they have not yet run. The 20261022 migrations add staff accounts, rider session location, payment visibility, corrected role-aware ticket writes/collections, Dine-in orders, shared New order display settings, and private menu-item image storage; check that each completes without errors.
 3. Copy `.env.example` to `.env.local` and set the project URL and publishable key. Never use a service-role key in a `VITE_` variable.
 4. Deploy the `staff-accounts` Edge Function before testing staff account controls. Supabase injects `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` into hosted Edge Functions; do not add them manually in Vercel or try to create `SUPABASE_` secrets. Leave JWT verification enabled. Never use the service-role key in Vite/Vercel environment variables. The browser only uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 5. Start the app using `start-app.bat` or `pnpm dev`. Sign in as the owner, create or edit a non-owner employee profile, then use **Create login** on that employee card. Usernames are globally unique and use lowercase letters, digits, and underscores (4–32 characters, starting with a letter). The owner sees a generated temporary password once and gives it privately to the employee. At first sign-in, the employee must change it to a password of at least 12 characters with upper- and lowercase letters and a number. Owners can reset, disable, and re-enable access from the employee card. The optional contact email does not create a new login.
@@ -25,13 +25,15 @@ In Shared mode, the owner opens Settings → Import Live Local. The app download
 
 ## Mobile implementation and verification
 
+The POS supports Pickup, Delivery, and Dine-in, with delivery-only fees, addresses, and rider assignment. Dine-in has an optional table/reference and no delivery fee. Shared New order settings control enabled order types, the default type, image visibility, tile/list layout, and tile size. Menu item pictures are compressed WebP objects in private Supabase storage in Shared mode and browser IndexedDB in local/demo modes; images are not stored in the workspace JSON. Only owners can manage menu images or these shared settings.
+
 The POS has a phone-sized Menu / Current ticket switch with a visible item count and total; the ticket footer remains reachable. Attendance changes to a scrollable day list below 600 px; each day opens the existing detail and shift form. Batch payment rows become cards. Existing tablet breakpoints keep the order board and forms responsive. Buttons in these flows target at least 44 CSS px where practical.
 
 `pnpm build` passed with the bundled modern Node runtime on 2026-10-12. The local browser automation tool blocked this local URL under its security policy, so 320 px, 390 px, 768 px, and desktop visual walkthroughs could not be completed in this session. CSS/source checks do not replace those device tests. The Vite build reports a bundle-size advisory, not a build failure.
 
 ## Current limitations
 
-The shared database uses one revisioned JSON document with indexed relational projections. Its single business-wide write lock favors correctness for a small team, but high write volume should move operations into narrower server transactions. Polling gives eventual screen refresh; it is not a push subscription. Logo uploads currently remain inline in the workspace document and should move to managed object storage before large image use. Demo local roles and records are separate from shared businesses.
+The shared database uses one revisioned JSON document with indexed relational projections. Its single business-wide write lock favors correctness for a small team, but high write volume should move operations into narrower server transactions. Polling gives eventual screen refresh; it is not a push subscription. Logo uploads currently remain inline in the workspace document; menu-item images use the private `menu-item-images` storage bucket. Demo local roles and records are separate from shared businesses.
 
 ## Employee account activation
 
@@ -55,7 +57,7 @@ The owner report uses confirmed shared workspace records (or explicitly labeled 
 
 ## Deployment checklist and limits
 
-1. Back up the database; apply any unapplied migrations in numeric order, including `202610220001_staff_rider_operations.sql`, `202610220002_rider_session_and_payment_visibility.sql`, and `202610220003_rider_pickup_status.sql`. The second enables `pg_cron`; the third fixes filtered-snapshot status writes, aligns server role transitions, and allows assigned riders to add a collection after delivery completion.
+1. Back up the database; apply any unapplied migrations in numeric order, including `202610220001_staff_rider_operations.sql`, `202610220002_rider_session_and_payment_visibility.sql`, `202610220003_rider_pickup_status.sql`, and `202610220004_dine_in_menu_images_and_order_display.sql`. The last migration adds the Dine-in order type, New order settings validation, staff order creation, and private menu-image storage policies. The second enables `pg_cron`; the third fixes filtered-snapshot status writes, aligns server role transitions, and allows assigned riders to add a collection after delivery completion.
 2. Deploy `supabase/functions/staff-accounts/index.ts` with JWT verification and the server-side Supabase secrets. Confirm that a non-owner JWT cannot call owner account actions.
 3. Verify owner and old staff email sign-in, then a new username account and forced password change. Check disable/re-enable and profile deactivation.
 4. Verify location permission, sharing before pickup and between deliveries, pause/resume, sign-out cleanup, stale/offline states, assigned ticket isolation, payment visibility by role, partial/full collections, overpayment rejection, duplicate request handling, and rider refund denial. Use a separate test business or reversible test tickets, not existing production orders.

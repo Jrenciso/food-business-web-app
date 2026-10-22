@@ -27,6 +27,16 @@ export function emptyLiveWorkspace():Database{
    activeUserId:'',dataMode:'live'}};
 }
 export const cloud={
+ async uploadMenuImage(businessId:string,itemId:string,file:Blob):Promise<string>{
+  const path=`${businessId}/${itemId}/${crypto.randomUUID()}.webp`;
+  const {error}=await client().storage.from('menu-item-images').upload(path,file,{contentType:'image/webp',upsert:false,cacheControl:'3600'});
+  if(error)throw Error(error.message);return `storage://${path}`;
+ },
+ async menuImageUrl(path:string):Promise<string>{
+  const key=path.replace(/^storage:\/\//,'');const {data,error}=await client().storage.from('menu-item-images').createSignedUrl(key,3600);
+  if(error)throw Error(error.message);return data.signedUrl;
+ },
+ async deleteMenuImage(path:string):Promise<void>{const key=path.replace(/^storage:\/\//,'');const {error}=await client().storage.from('menu-item-images').remove([key]);if(error)throw Error(error.message)},
  async staffPasswordRequired():Promise<boolean>{
   const {data,error}=await client().rpc('staff_password_change_required');
   // An older Supabase project has no username accounts yet. Keep existing owner
@@ -59,6 +69,7 @@ export const cloud={
  async createBusiness(name:string):Promise<string>{const initial=emptyLiveWorkspace();initial.settings.businessName=name.trim();return unwrap(await client().rpc('create_business',{p_name:name.trim(),p_initial:initial})) as string},
  async read(businessId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc('read_operations',{p_business_id:businessId})) as CloudSnapshot},
  async apply(businessId:string,revision:number,action:string,next:Database,requestId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc('apply_operations',{p_business_id:businessId,p_expected_revision:revision,p_action:action,p_next:next,p_request_id:requestId})) as CloudSnapshot},
+ async staffOrder(businessId:string,revision:number,next:Database,requestId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc('apply_staff_order',{p_business_id:businessId,p_expected_revision:revision,p_next:next,p_request_id:requestId})) as CloudSnapshot},
  async saveEmployeeAccess(businessId:string,revision:number,next:Database,requestId:string,email:string,role:Role,employeeId:string,active:boolean):Promise<CloudSnapshot>{return unwrap(await client().rpc('save_employee_access',{p_business_id:businessId,p_expected_revision:revision,p_next:next,p_request_id:requestId,p_email:email,p_role:role,p_employee_id:employeeId,p_active:active})) as CloudSnapshot},
  async importLocal(businessId:string,revision:number,local:Database,requestId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc('import_local_operations',{p_business_id:businessId,p_expected_revision:revision,p_import:local,p_request_id:requestId})) as CloudSnapshot},
  async setMember(businessId:string,email:string,role:Role,employeeId:string,active:boolean):Promise<'linked'|'pending'|'disabled'>{const {data,error}=await client().rpc('set_business_member',{p_business_id:businessId,p_email:email,p_role:role,p_employee_id:employeeId||null,p_active:active});if(error)throw Error(error.message);return data as 'linked'|'pending'|'disabled'},

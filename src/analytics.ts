@@ -12,7 +12,7 @@ export function menuPerformance(orders:Order[]){const rows=new Map<string,{id:st
 export function dashboardSnapshot(d:Database,day:string){
  const orders=periodOrders(d,day,day),sales=orderMetrics(orders),payments=paymentFlow(d,day,day);
  const attendance=d.attendance.filter(a=>a.date===day),worked=attendance.filter(a=>a.worked);
- const channels=(['pickup','delivery'] as const).map(type=>{const list=sales.active.filter(o=>o.type===type);return {type,count:list.length,total:list.reduce((n,o)=>n+o.total,0)}});
+ const channels=(['pickup','delivery','dine-in'] as const).map(type=>{const list=sales.active.filter(o=>o.type===type);return {type,count:list.length,total:list.reduce((n,o)=>n+o.total,0)}});
  const statuses=(['New','Preparing','Ready','Picked up','Out for delivery','Completed','Cancelled'] as const).map(status=>({status,count:orders.filter(o=>o.status===status).length}));
  const methods=paymentMethodSummary(d.settings,payments.payments).map(method=>({...method,total:payments.payments.filter(p=>p.method===method.id&&paymentMethodLabel(d.settings,p.method,p.methodLabel)===method.label).reduce((n,p)=>n+(p.kind==='payment'?p.amount:-p.amount),0)}));
  return {orders,sales,payments,attendance,workedCount:new Set(worked.map(a=>a.employeeId)).size,attendanceTotal:attendance.reduce((n,a)=>n+attendanceCost(a),0),labor:laborCost(d,day,day),channels,statuses,methods};
