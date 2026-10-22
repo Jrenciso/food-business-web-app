@@ -33,8 +33,13 @@ begin
   end if;
   v_next:=p_next;
   if v_member.role<>'owner' then
+    -- Rider read_operations deliberately returns only deliveries assigned to
+    -- this rider. Accept that filtered list; never require the browser to send
+    -- every business order back to the database.
     if jsonb_typeof(p_next->'orders')<>'array' or
-       jsonb_array_length(p_next->'orders')<>jsonb_array_length(v_state.data->'orders') then
+       jsonb_array_length(p_next->'orders')>jsonb_array_length(v_state.data->'orders') or
+       (select count(distinct value->>'id') from jsonb_array_elements(p_next->'orders'))<>
+         jsonb_array_length(p_next->'orders') then
       raise exception 'Staff may only change ticket status' using errcode='42501';
     end if;
     v_orders:=v_state.data->'orders';
