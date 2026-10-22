@@ -10,7 +10,10 @@ export const cloudClient:SupabaseClient|null=cloudConfigured?createClient(url!,k
  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true},
 }):null;
 const client=()=>{if(!cloudClient)throw Error('Shared backend is not configured.');return cloudClient};
-const unwrap=<T>(result:{data:T;error:{message:string}|null}):NonNullable<T>=>{if(result.error)throw Error(result.error.message);if(result.data===null)throw Error('The server returned no data.');return result.data as NonNullable<T>};
+const unwrap=<T>(result:{data:T;error:{message:string;code?:string;status?:number}|null}):NonNullable<T>=>{
+ if(result.error)throw Object.assign(Error(result.error.message),{code:result.error.code,status:result.error.status});
+ if(result.data===null)throw Error('The server returned no data.');return result.data as NonNullable<T>
+};
 
 export interface CloudBusiness { business_id:string;business_name:string;member_role:Role;employee_id:string|null;display_name:string }
 export interface CloudSnapshot { data:Database;revision:number;role:Role;employeeId:string|null;displayName:string;accessStatus?:'linked'|'pending'|'disabled' }

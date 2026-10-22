@@ -11,11 +11,15 @@ create or replace function public.apply_operations(
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_member public.business_memberships%rowtype; v_state public.workspace_state%rowtype;
         v_response jsonb; v_next jsonb; v_order jsonb; v_old_order jsonb;
-        v_orders jsonb; v_change_count integer:=0;
+        v_orders jsonb; v_change_count integer:=0; v_old_history jsonb; v_new_history jsonb;
+        v_previous_at timestamptz; v_new_at timestamptz; v_transition_allowed boolean;
 begin
   select * into v_member from public.business_memberships
     where business_id=p_business_id and user_id=auth.uid() and active;
   if not found then raise exception 'Access denied' using errcode='42501'; end if;
+  if public.staff_password_change_required() then
+    raise exception 'Password change required' using errcode='42501';
+  end if;
   select response into v_response from public.operation_request
     where business_id=p_business_id and request_id=p_request_id;
   if found then return v_response; end if;
@@ -44,6 +48,37 @@ begin
       if v_order->'status' is distinct from v_old_order->'status' or
          v_order->'statusHistory' is distinct from v_old_order->'statusHistory' then
         v_change_count:=v_change_count+1;
+        if jsonb_typeof(v_order->'status')<>'string' or
+           jsonb_typeof(v_order->'statusHistory')<>'array' then
+          raise exception 'Invalid ticket status update' using errcode='42501';
+        end if;
+        v_old_history:=coalesce(v_old_order->'statusHistory','[]'::jsonb);
+        v_new_history:=v_order->'statusHistory';
+        if jsonb_array_length(v_new_history)<>jsonb_array_length(v_old_history)+1 or
+           (v_new_history - (jsonb_array_length(v_new_history)-1))<>v_old_history or
+           v_new_history->(jsonb_array_length(v_new_history)-1)->>'status'<>v_order->>'status' or
+           nullif(v_new_history->(jsonb_array_length(v_new_history)-1)->>'at','') is null then
+          raise exception 'Status history must append exactly one matching event' using errcode='42501';
+        end if;
+        v_new_at:=(v_new_history->(jsonb_array_length(v_new_history)-1)->>'at')::timestamptz;
+        if jsonb_array_length(v_old_history)>0 then
+          v_previous_at:=(v_old_history->(jsonb_array_length(v_old_history)-1)->>'at')::timestamptz;
+          if v_new_at<=v_previous_at then raise exception 'Status timestamp must move forward' using errcode='42501'; end if;
+        end if;
+        v_transition_allowed:=case
+          when v_member.role in ('chef','kitchen') then p_action='prep' and (
+            (v_old_order->>'status'='New' and v_order->>'status'='Preparing') or
+            (v_old_order->>'status'='Preparing' and v_order->>'status'='Ready') or
+            (v_old_order->>'status'='Ready' and v_order->>'status'='Picked up'))
+          when v_member.role='rider' then p_action='deliver' and
+            v_old_order->>'type'='delivery' and v_old_order->>'riderId'=v_member.employee_id and (
+            (v_old_order->>'status'='Ready' and v_order->>'status'='Picked up') or
+            (v_old_order->>'status'='Picked up' and v_order->>'status'='Out for delivery') or
+            (v_old_order->>'status'='Out for delivery' and v_order->>'status'='Completed'))
+          else false end;
+        if not coalesce(v_transition_allowed,false) then
+          raise exception 'This role cannot make that ticket status transition' using errcode='42501';
+        end if;
         v_order:=jsonb_set(jsonb_set(v_old_order,'{status}',v_order->'status'),
           '{statusHistory}',v_order->'statusHistory');
         select jsonb_agg(case when value->>'id'=v_order->>'id' then v_order else value end)
@@ -53,8 +88,10 @@ begin
     if v_change_count<>1 then raise exception 'One ticket update is required'; end if;
     v_next:=jsonb_set(v_state.data,'{orders}',v_orders);
   end if;
-  perform public.validate_operations_change(p_business_id,v_state.data,v_next,p_action,
-    v_member.role,v_member.employee_id);
+  if v_member.role='owner' then
+    perform public.validate_operations_change(p_business_id,v_state.data,v_next,p_action,
+      v_member.role,v_member.employee_id);
+  end if;
   v_next:=jsonb_set(v_next,'{activity}','[]'::jsonb,true);
   perform public.rebuild_operations_indexes(p_business_id,v_next);
   update public.workspace_state set data=v_next,revision=revision+1,updated_at=now()

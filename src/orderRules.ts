@@ -28,7 +28,7 @@ export function nextOrderStatuses(order:Order,role:Role,userId:string):Status[]{
  if(role==='chef'||role==='kitchen'){
   if(status==='New')return ['Preparing'];
   if(status==='Preparing')return ['Ready'];
-  if(status==='Ready'&&type==='pickup')return ['Picked up'];
+  if(status==='Ready')return ['Picked up'];
   return [];
  }
  if(status==='New')return ['Preparing','Cancelled'];

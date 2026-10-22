@@ -75,8 +75,16 @@ function CloudProvider({children,onSwitch}:{children:React.ReactNode;onSwitch:(m
    const next=operation.access?await cloud.saveEmployeeAccess(businessId,operation.revision,operation.next,operation.requestId,operation.access.email,operation.access.role,operation.access.employeeId,operation.access.active):await cloud.apply(businessId,operation.revision,operation.action,operation.next,operation.requestId);
    accept(next);pendingRef.current=null;notify(next.accessStatus==='pending'?'Employee saved. Ask them to create and confirm an account with this email.':next.accessStatus==='disabled'?'Employee saved; app access disabled.':next.accessStatus==='linked'?'Employee saved; app access linked.':'Saved to shared workspace');return true;
   }catch(e){const message=e instanceof Error?e.message:'Save did not reach the server.';
-   if(/Workspace changed|revision|40001/i.test(message)){pendingRef.current=null;
+   const code=e&&typeof e==='object'&&'code' in e?String((e as {code?:unknown}).code||''):'';
+   const status=e&&typeof e==='object'&&'status' in e?Number((e as {status?:unknown}).status):0;
+   if(code==='40001'||/Workspace changed|revision|40001/i.test(message)){pendingRef.current=null;
     try{accept(await cloud.read(businessId))}catch{}notify('Another device changed this workspace. Review the latest data and retry your edit.','error')}
+   else if(code==='42501'||code==='P0001'||code.startsWith('22')||code.startsWith('23')||code.startsWith('PGRST')||(status>=400&&status<500&&status!==408&&status!==429)){
+    // A server rejection did not create a write to retry. Clear the queue and
+    // refresh the authoritative view so one denied action cannot block later work.
+    pendingRef.current=null;setSaveState('idle');
+    try{accept(await cloud.read(businessId))}catch{}
+    notify(message,'error')}
    else{pendingRef.current=operation;setSaveState('error');notify(`Save unconfirmed: ${message}. Use Retry pending save before submitting again.`,'error')}
    return false;
   }finally{busyRef.current=false}};
