@@ -38,8 +38,8 @@ Deno.serve(async request => {
     const { data: allowed } = await scoped.rpc('allow_credential_operation');
     if (!allowed) return json({ error: 'Too many account requests. Try again later.' }, 429);
     const next = String(input.password || '');
-    if (next.length < 12 || next.length > 128 || !/[a-z]/.test(next) || !/[A-Z]/.test(next) || !/\d/.test(next))
-      return json({ error: 'Use 12 or more characters with upper and lower case letters and a number.' }, 400);
+    if (next.length < 6 || next.length > 128)
+      return json({ error: 'Use at least 6 characters.' }, 400);
     const { data: account } = await admin.from('staff_accounts').select('user_id').eq('user_id', identity.user.id).maybeSingle();
     if (!account) return json({ error: 'Account unavailable' }, 403);
     const { error: changed } = await admin.auth.admin.updateUserById(identity.user.id, { password: next });
