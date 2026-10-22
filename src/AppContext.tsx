@@ -5,7 +5,7 @@ import { cloud, cloudConfigured, emptyLiveWorkspace, type CloudBusiness, type Cl
 import type { Database, Role, TeamMember } from './types';
 export type Page='dashboard'|'pos'|'orders'|'menu'|'employees'|'attendance'|'payroll'|'reports'|'settings';
 type Workspace='sample'|'live';
-interface State {data:Database;user:TeamMember;role:Role;workspace:Workspace;signedIn:boolean;page:Page;setPage:(p:Page)=>void;attendanceDate:string;setAttendanceDate:(date:string)=>void;commit:(action:Parameters<typeof can>[1],fn:(d:Database)=>void,access?:{email:string;role:Role;employeeId:string;active:boolean})=>Promise<boolean>;switchRole:(id:string)=>void;switchWorkspace:(w:Workspace)=>void;signIn:(id:string,w:Workspace)=>boolean;signOut:()=>void;replace:(d:Database)=>void;notify:(message:string,kind?:'success'|'error'|'info')=>void;cloudMode:boolean;cloudAvailable:boolean;switchMode:(mode:'demo'|'cloud')=>void;authReady:boolean;cloudAuthenticated:boolean;cloudBusinesses:CloudBusiness[];cloudBusinessId:string;cloudSignIn:(email:string,password:string)=>Promise<boolean>;cloudSignUp:(email:string,password:string)=>Promise<boolean>;cloudCreateBusiness:(name:string)=>Promise<boolean>;cloudSelectBusiness:(id:string)=>Promise<boolean>;cloudImportLocal:()=>Promise<boolean>;cloudSetMember:(email:string,role:Role,employeeId:string,active:boolean)=>Promise<boolean>;saveState:'idle'|'saving'|'error';retryPending:()=>Promise<void>}
+interface State {data:Database;user:TeamMember;role:Role;workspace:Workspace;signedIn:boolean;page:Page;setPage:(p:Page)=>void;attendanceDate:string;setAttendanceDate:(date:string)=>void;commit:(action:Parameters<typeof can>[1],fn:(d:Database)=>void,access?:{email:string;role:Role;employeeId:string;active:boolean})=>Promise<boolean>;switchRole:(id:string)=>void;switchWorkspace:(w:Workspace)=>void;signIn:(id:string,w:Workspace)=>boolean;signOut:()=>void;replace:(d:Database)=>void;notify:(message:string,kind?:'success'|'error'|'info')=>void;cloudMode:boolean;cloudAvailable:boolean;switchMode:(mode:'demo'|'cloud')=>void;authReady:boolean;cloudAuthenticated:boolean;cloudBusinesses:CloudBusiness[];cloudBusinessId:string;cloudSignIn:(email:string,password:string)=>Promise<boolean>;cloudSignUp:(email:string,password:string)=>Promise<boolean>;cloudCreateBusiness:(name:string)=>Promise<boolean>;cloudSelectBusiness:(id:string)=>Promise<boolean>;cloudImportLocal:()=>Promise<boolean>;cloudSetMember:(email:string,role:Role,employeeId:string,active:boolean)=>Promise<boolean>;staffPasswordRequired:boolean;changeStaffPassword:(password:string)=>Promise<boolean>;refreshCloud:()=>Promise<void>;saveState:'idle'|'saving'|'error';retryPending:()=>Promise<void>}
 const Context=createContext<State|null>(null);
 export const useApp=()=>{const c=useContext(Context);if(!c)throw Error('App context missing');return c};
 const SESSION='urban-ops-demo-session';
@@ -28,7 +28,7 @@ function DemoProvider({children,onSwitch}:{children:React.ReactNode;onSwitch:(mo
  const switchRole=(id:string)=>{const next=data.team.find(t=>t.id===id&&t.active);if(!next){notify('That demo profile is unavailable.','error');return}try{localStorage.setItem(SESSION,id);setSession(id);setPage(next.role==='owner'?'dashboard':'orders');notify(`Previewing ${next.name}`)}catch{notify('Could not switch demo role.','error')}};
  const switchWorkspace=(w:Workspace)=>{if(w===workspace)return;try{const next=db.load(w),actor=next.team.find(t=>t.id===user.id&&t.active)||next.team.find(t=>t.role==='owner'&&t.active);if(!actor)throw Error('No active profile');setActiveWorkspace(w);localStorage.setItem(SESSION,actor.id);setWorkspace(w);setData(next);setSession(actor.id);setPage(actor.role==='owner'?'dashboard':'orders');notify(`Opened ${w==='sample'?'SAMPLE / TEST DATA':'LIVE LOCAL'} workspace`)}catch{notify('Could not open workspace.','error')}};
  const replace=(next:Database)=>{try{db.save(next);setData(next);notify('Changes saved')}catch{notify('Could not save. Browser storage may be full.','error')}};
- return <Context.Provider value={{data,user,role,workspace,signedIn,page,setPage,attendanceDate,setAttendanceDate,commit,switchRole,switchWorkspace,signIn,signOut,replace,notify,cloudMode:false,cloudAvailable:cloudConfigured,switchMode:onSwitch,authReady:true,cloudAuthenticated:false,cloudBusinesses:[],cloudBusinessId:'',cloudSignIn:async()=>false,cloudSignUp:async()=>false,cloudCreateBusiness:async()=>false,cloudSelectBusiness:async()=>false,cloudImportLocal:async()=>false,cloudSetMember:async()=>false,saveState:'idle',retryPending:async()=>{}}}>{children}{toast&&<div className={`toast toast-${toast.kind}`} role={toast.kind==='error'?'alert':'status'} aria-live={toast.kind==='error'?'assertive':'polite'}><span className="toast-icon">{toast.kind==='error'?<AlertCircle/>:toast.kind==='success'?<CheckCircle2/>:<Info/>}</span><span>{toast.message}</span><button aria-label="Dismiss notification" onClick={()=>setToast(null)}><X size={18}/></button></div>}</Context.Provider>
+ return <Context.Provider value={{data,user,role,workspace,signedIn,page,setPage,attendanceDate,setAttendanceDate,commit,switchRole,switchWorkspace,signIn,signOut,replace,notify,cloudMode:false,cloudAvailable:cloudConfigured,switchMode:onSwitch,authReady:true,cloudAuthenticated:false,cloudBusinesses:[],cloudBusinessId:'',cloudSignIn:async()=>false,cloudSignUp:async()=>false,cloudCreateBusiness:async()=>false,cloudSelectBusiness:async()=>false,cloudImportLocal:async()=>false,cloudSetMember:async()=>false,staffPasswordRequired:false,changeStaffPassword:async()=>false,refreshCloud:async()=>{},saveState:'idle',retryPending:async()=>{}}}>{children}{toast&&<div className={`toast toast-${toast.kind}`} role={toast.kind==='error'?'alert':'status'} aria-live={toast.kind==='error'?'assertive':'polite'}><span className="toast-icon">{toast.kind==='error'?<AlertCircle/>:toast.kind==='success'?<CheckCircle2/>:<Info/>}</span><span>{toast.message}</span><button aria-label="Dismiss notification" onClick={()=>setToast(null)}><X size={18}/></button></div>}</Context.Provider>
 }
 
 type PendingCloudWrite={action:Parameters<typeof can>[1];next:Database;revision:number;requestId:string;access?:{email:string;role:Role;employeeId:string;active:boolean}};
@@ -36,26 +36,37 @@ function CloudProvider({children,onSwitch}:{children:React.ReactNode;onSwitch:(m
  const [snapshot,setSnapshot]=useState<CloudSnapshot|null>(null),snapshotRef=useRef<CloudSnapshot|null>(null);
  const [businesses,setBusinesses]=useState<CloudBusiness[]>([]),[businessId,setBusinessId]=useState('');
  const [authReady,setAuthReady]=useState(false),[authenticated,setAuthenticated]=useState(false);
+ const [staffPasswordRequired,setStaffPasswordRequired]=useState(false);
  const [saveState,setSaveState]=useState<'idle'|'saving'|'error'>('idle');
  const [page,setPage]=useState<Page>('dashboard'),[attendanceDate,setAttendanceDate]=useState('');
  const [toast,setToast]=useState<{id:number;message:string;kind:'success'|'error'|'info'}|null>(null);
  const pendingRef=useRef<PendingCloudWrite|null>(null),busyRef=useRef(false);
  const data=snapshot?.data||emptyLiveWorkspace(),role=snapshot?.role||'owner';
- const user:TeamMember={id:snapshot?.employeeId||'',name:snapshot?.displayName||'Member',contact:'',role,
+ const user:TeamMember={id:snapshot?.employeeId||'',name:snapshot?.displayName||(role==='owner'?'Owner':'Member'),contact:'',role,
   title:'',active:true,activeFrom:'',activeTo:'',notes:'',rates:[]};
  const signedIn=authenticated&&!!snapshot;
  const notify:State['notify']=(message,kind='success')=>setToast({id:Date.now(),message,kind});
  const accept=(next:CloudSnapshot)=>{snapshotRef.current=next;setSnapshot(next);setSaveState('idle')};
- const loadBusiness=async(id:string)=>{const next=await cloud.read(id);accept(next);setBusinessId(id);
-  localStorage.setItem('urban-ops-cloud-business',id);setPage(next.role==='owner'?'dashboard':'orders')};
- const initialize=async()=>{try{const session=await cloud.session();if(!session.user){setAuthenticated(false);setSnapshot(null);snapshotRef.current=null;return}
+ const loadBusiness=async(id:string,navigate=true)=>{const next=await cloud.read(id);accept(next);setBusinessId(id);
+  localStorage.setItem('urban-ops-cloud-business',id);if(navigate)setPage(next.role==='owner'?'dashboard':'orders')};
+ const initialize=async()=>{try{const session=await cloud.session();if(!session.user){setAuthenticated(false);setSnapshot(null);snapshotRef.current=null;setStaffPasswordRequired(false);return}
+   const passwordRequired=await cloud.staffPasswordRequired();setStaffPasswordRequired(passwordRequired);
+   if(passwordRequired){setAuthenticated(true);setSnapshot(null);snapshotRef.current=null;return}
    setAuthenticated(true);const list=await cloud.businesses();setBusinesses(list);
    const remembered=localStorage.getItem('urban-ops-cloud-business');const chosen=list.find(b=>b.business_id===remembered)||list[0];
-   if(chosen)await loadBusiness(chosen.business_id);
+    // Initialization may run again after auth changes or tab resume. Refresh
+    // the data without overriding the page the user is currently viewing.
+    if(chosen)await loadBusiness(chosen.business_id,false);
   }catch(e){notify(e instanceof Error?e.message:'Could not connect to shared workspace.','error')}
   finally{setAuthReady(true)}};
- useEffect(()=>{void initialize();const subscription=cloud.onAuthChange(()=>{void initialize()});return()=>subscription.unsubscribe()},[]);
- useEffect(()=>{if(!businessId)return;const id=window.setInterval(()=>{if(!pendingRef.current&&!busyRef.current)void cloud.read(businessId).then(next=>{if(next.revision!==snapshotRef.current?.revision)accept(next)}).catch(()=>setSaveState('error'))},12000);return()=>clearInterval(id)},[businessId]);
+ useEffect(()=>{void initialize();const subscription=cloud.onAuthChange(event=>{
+   // Session restoration and token refreshes are routine background events.
+   // Re-running initialize for them reloads the business and sends owners back
+   // to the dashboard, even when they are actively working on another page.
+   if(event==='INITIAL_SESSION'||event==='TOKEN_REFRESHED')return;
+   void initialize();
+  });return()=>subscription.unsubscribe()},[]);
+ useEffect(()=>{if(!businessId)return;const id=window.setInterval(()=>{if(!pendingRef.current&&!busyRef.current)void cloud.read(businessId).then(next=>{if(next.revision!==snapshotRef.current?.revision)accept(next)}).catch(e=>{if(/access denied|password change required/i.test(e instanceof Error?e.message:'')){snapshotRef.current=null;setSnapshot(null);setBusinessId('');setBusinesses([]);notify('Business access is no longer available.','error')}else setSaveState('error')})},12000);return()=>clearInterval(id)},[businessId]);
  useEffect(()=>{document.documentElement.dataset.theme=data.settings.theme;document.documentElement.style.setProperty('--accent',data.settings.accent)},[data.settings.theme,data.settings.accent]);
  useEffect(()=>{document.title=`${data.settings.businessName||'Food Operations'} | Operations`},[data.settings.businessName]);
  useEffect(()=>{if(signedIn&&role!=='owner'&&page!=='orders')setPage('orders')},[signedIn,role,page]);
@@ -73,10 +84,12 @@ function CloudProvider({children,onSwitch}:{children:React.ReactNode;onSwitch:(m
   if(pendingRef.current||busyRef.current){notify('A save is pending. Retry it before making another change.','error');return false}
   try{const current=snapshotRef.current;const actor={...user,id:current.employeeId||user.id,role:current.role};
    const next=db.prepareMutation(current.data,current.role,action,fn,actor);
+   if(current.role!=='owner')for(const order of next.orders)delete order.paidAmount;
    return await send({action,next,revision:current.revision,requestId:crypto.randomUUID(),access});
   }catch(e){notify(e instanceof Error?e.message:'Could not prepare change.','error');return false}};
  const retryPending=async()=>{if(pendingRef.current&&!busyRef.current)await send(pendingRef.current)};
- const cloudSignIn=async(email:string,password:string)=>{try{await cloud.signIn(email,password);await initialize();return true}catch(e){notify(e instanceof Error?e.message:'Sign-in failed.','error');return false}};
+ const cloudSignIn=async(identifier:string,password:string)=>{try{const normalized=identifier.trim().toLowerCase();const email=normalized.includes('@')?normalized:`${normalized}@staff.urbancasero.invalid`;await cloud.signIn(email,password);await initialize();return true}catch{notify('Sign-in failed. Check your sign-in details and try again.','error');return false}};
+ const changeStaffPassword=async(password:string)=>{try{await cloud.staffAccount('change-password','',undefined,undefined,password);setStaffPasswordRequired(false);await initialize();notify('Password changed');return true}catch(e){notify(e instanceof Error?e.message:'Could not change password.','error');return false}};
  const cloudSignUp=async(email:string,password:string)=>{try{await cloud.signUp(email,password);notify('Account created. Open the confirmation email, then sign in.','info');return true}catch(e){notify(e instanceof Error?e.message:'Could not create account.','error');return false}};
  const cloudCreateBusiness=async(name:string)=>{try{const id=await cloud.createBusiness(name);setBusinesses(await cloud.businesses());await loadBusiness(id);return true}catch(e){notify(e instanceof Error?e.message:'Could not create business.','error');return false}};
  const cloudSelectBusiness=async(id:string)=>{try{await loadBusiness(id);return true}catch(e){notify(e instanceof Error?e.message:'Could not open business.','error');return false}};
@@ -87,12 +100,12 @@ function CloudProvider({children,onSwitch}:{children:React.ReactNode;onSwitch:(m
   try{setSaveState('saving');const next=await cloud.importLocal(businessId,snapshot.revision,local,crypto.randomUUID());accept(next);notify('Live Local records imported into the shared business. Keep the backup file.');return true}
   catch(e){setSaveState('error');notify(e instanceof Error?e.message:'Import failed. Local records remain in this browser.','error');return false}};
  const cloudSetMember=async(email:string,newRole:Role,employeeId:string,active:boolean)=>{try{const result=await cloud.setMember(businessId,email,newRole,employeeId,active);notify(result==='pending'?'Access saved. Ask the employee to create and confirm an account with this email.':result==='disabled'?'Employee access disabled.':'Employee access linked.');return true}catch(e){notify(e instanceof Error?e.message:'Membership update failed.','error');return false}};
- const signOut=()=>{void cloud.signOut().then(()=>{setAuthenticated(false);setSnapshot(null);snapshotRef.current=null;setBusinessId('');setBusinesses([]);setPage('dashboard')}).catch(e=>notify(e instanceof Error?e.message:'Could not sign out.','error'))};
+ const signOut=()=>{void (async()=>{try{if(role==='rider'&&businessId)await cloud.stopRiderLocation(businessId);await cloud.signOut();setAuthenticated(false);setSnapshot(null);snapshotRef.current=null;setBusinessId('');setBusinesses([]);setPage('dashboard')}catch(e){notify(e instanceof Error?e.message:'Could not sign out.','error')}})()};
  const noDemo=()=>notify('Demo role and workspace switches are unavailable in shared mode.','error');
  return <Context.Provider value={{data,user,role,workspace:'live',signedIn,page,setPage,attendanceDate,setAttendanceDate,
   commit,switchRole:noDemo,switchWorkspace:noDemo,signIn:()=>false,signOut,replace:noDemo,notify,
   cloudMode:true,cloudAvailable:true,switchMode:onSwitch,authReady,cloudAuthenticated:authenticated,cloudBusinesses:businesses,cloudBusinessId:businessId,
-  cloudSignIn,cloudSignUp,cloudCreateBusiness,cloudSelectBusiness,cloudImportLocal,cloudSetMember,saveState,retryPending}}>
+  cloudSignIn,cloudSignUp,cloudCreateBusiness,cloudSelectBusiness,cloudImportLocal,cloudSetMember,staffPasswordRequired,changeStaffPassword,refreshCloud:initialize,saveState,retryPending}}>
   {children}{toast&&<div className={`toast toast-${toast.kind}`} role={toast.kind==='error'?'alert':'status'} aria-live={toast.kind==='error'?'assertive':'polite'}><span className="toast-icon">{toast.kind==='error'?<AlertCircle/>:toast.kind==='success'?<CheckCircle2/>:<Info/>}</span><span>{toast.message}</span><button aria-label="Dismiss notification" onClick={()=>setToast(null)}><X size={18}/></button></div>}
  </Context.Provider>;
 }

@@ -103,3 +103,19 @@
 .password-visibility{position:absolute;right:5px;display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
 .password-visibility:hover{background:var(--bg);color:var(--ink)}
 .password-visibility:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.staff-account-panel,.tracking-panel,.accounting-panel{margin-top:1rem;padding:1rem;min-width:0}
+.staff-account-panel{border-top:1px solid var(--line,#e8ded0)}
+.staff-account-actions,.accounting-controls{display:flex;flex-wrap:wrap;align-items:end;gap:.65rem}
+.staff-account-actions input{min-width:0;flex:1 1 11rem}
+.issued-password{margin-top:.75rem;padding:.8rem;border-radius:.65rem;background:#fff4df;overflow-wrap:anywhere}
+.issued-password code{font-size:1rem;font-weight:700}
+.tracking-panel{margin-bottom:1rem}
+.rider-location-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.5rem;margin:1rem 0}
+.rider-location-list button{text-align:left;white-space:normal;min-height:64px}
+.rider-location-list small{display:block;margin-top:.25rem}
+.rider-map iframe{display:block;width:100%;height:300px;border:0;border-radius:.6rem;margin-bottom:.5rem}
+.accounting-panel{margin:1rem;max-width:100%}
+.accounting-controls{margin:1rem 0}
+.accounting-controls label{min-width:150px}
+.accounting-controls input{max-width:100%}
+@media(max-width:640px){.staff-account-actions button,.tracking-panel>button,.accounting-panel .report-actions button{min-height:44px}.accounting-panel{margin:1rem 0}.accounting-controls label{flex:1 1 130px}.rider-map iframe{height:240px}}

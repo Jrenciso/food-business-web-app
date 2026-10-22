@@ -22,9 +22,9 @@ The entry page offers local demo profiles: Alex Reyes (owner), Sam Dela Cruz (ch
 
 The owner can switch workspaces in the sidebar or Settings. Settings also provides a JSON backup of the current workspace. Resetting the sample workspace requires confirmation and archives prior sample records within the sample workspace backup fields. Download a JSON backup before resetting or clearing browser storage.
 
-Shared mode is available when Supabase is configured. Apply the SQL migrations in order; the second adds owner-managed employee email access and staff self-registration. See [backend and mobile setup](docs/backend-and-mobile.md) for the migration, sign-in, import, security model, and remaining go-live checks.
+Shared mode is available when Supabase is configured. Apply the SQL migrations in order. The current staff flow uses owner-issued usernames; existing staff email sign-ins remain valid during migration. See [backend and mobile setup](docs/backend-and-mobile.md) for deployment, sign-in, security, and go-live checks.
 
-**Demo mode is not production authentication or shared storage.** The demo profile chooser has no password. Client-side role checks and records can be changed by anyone with browser storage access. Real multi-user operation requires a hosted shared database, real sign-in, server-side authorization, reliable backups/restore, deployment and TLS, and a plan to migrate verified business data. The shared backend code is present, but no Supabase credentials or deployment are configured in this project; live operation still requires setup and integration verification.
+**Demo mode is not production authentication or shared storage.** The demo profile chooser has no password. Client-side role checks and records can be changed by anyone with browser storage access. Shared operation requires a hosted database, real sign-in, server authorization, backups, TLS, and integration checks. This repository does not contain private Supabase keys; deployment status must be verified in the target project.
 
 ## Orders and pricing
 
