@@ -9,6 +9,7 @@ for (const role of ['chef','kitchen']) {
   assert.deepEqual(nextOrderStatuses(order('New'),role,'staff-1'),['Preparing']);
   assert.deepEqual(nextOrderStatuses(order('Preparing'),role,'staff-1'),['Ready']);
   assert.deepEqual(nextOrderStatuses(order('Ready','pickup'),role,'staff-1'),['Picked up']);
+  assert.deepEqual(nextOrderStatuses(order('Ready','take-out'),role,'staff-1'),['Picked up']);
   assert.deepEqual(nextOrderStatuses(order('Ready','dine-in'),role,'staff-1'),[]);
   assert.deepEqual(nextOrderStatuses(order('Ready','delivery'),role,'staff-1'),['Picked up']);
   assert.deepEqual(nextOrderStatuses(order('Picked up'),role,'staff-1'),[]);
@@ -24,6 +25,7 @@ assert.deepEqual(nextOrderStatuses(order('New'), 'rider','rider-1'),[]);
 assert.deepEqual(nextOrderStatuses(order('Cancelled'), 'rider','rider-1'),[]);
 
 assert.deepEqual(nextOrderStatuses(order('Ready','delivery'), 'owner','owner-1'),['Picked up','Cancelled']);
+assert.deepEqual(nextOrderStatuses(order('Ready','take-out'), 'owner','owner-1'),['Picked up','Completed','Cancelled']);
 assert.deepEqual(nextOrderStatuses(order('Ready','dine-in'), 'owner','owner-1'),['Completed','Cancelled']);
 assert.deepEqual(nextOrderStatuses(order('Picked up','dine-in'), 'owner','owner-1'),[]);
 assert.deepEqual(nextOrderStatuses(order('Out for delivery'), 'owner','owner-1'),['Completed','Cancelled']);

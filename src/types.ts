@@ -1,5 +1,5 @@
 export type Role = 'owner' | 'kitchen' | 'chef' | 'rider';
-export type OrderType = 'pickup' | 'delivery' | 'dine-in';
+export type OrderType = 'pickup' | 'take-out' | 'delivery' | 'dine-in';
 export type Status = 'New' | 'Preparing' | 'Ready' | 'Picked up' | 'Out for delivery' | 'Completed' | 'Cancelled';
 export type PayMethod = string;
 export interface PaymentMethodOption { id:string; label:string; active:boolean; order:number }
@@ -23,6 +23,6 @@ export interface PayrollPaymentRecord { at:string; date:string; method:string; m
 export interface PayrollBatchRow { employeeId:string; employeeName:string; role:string; lines:PayrollLine[]; adjustments:PayrollBatchAdjustment[]; base:number; additions:number; deductions:number; net:number; payment?:PayrollPaymentRecord|null; paymentHistory?:PayrollPaymentRecord[] }
 export interface PayrollBatch { id:string; number:string; from:string; to:string; createdAt:string; status:'generated'|'void'; rows:PayrollBatchRow[]; origin?:'legacy'; voidedAt?:string }
 export interface PayrollDraft { from:string; to:string; preset:'day'|'week'|'month'|'custom'|'schedule'; employeeIds:string[]; adjustments:Record<string,PayrollBatchAdjustment[]> }
-export interface NewOrderDisplaySettings { showImages:boolean; layout:'tiles'|'list'; tileSize:'compact'|'standard'|'large'; enabledOrderTypes:OrderType[]; defaultOrderType:OrderType }
+export interface NewOrderDisplaySettings { showImages:boolean; layout:'tiles'|'list'; tileSize:'compact'|'standard'|'large'; enabledOrderTypes:OrderType[] }
 export interface Settings { businessName:string; tagline:string; logo:string; phone:string; address:string; currency:string; timezone:string; footer:string; defaultDeliveryFee:number; accent:string; theme:'light'|'dark'; activeUserId:string; dataMode:'sample'|'live'; tileSizes?:Record<string,'compact'|'comfortable'|'large'>; newOrderDisplay?:NewOrderDisplaySettings; payrollSchedule?:'weekly'|'twice-monthly'|'monthly'; payrollCutoff?:number; paymentMethods?:PaymentMethodOption[] }
 export interface Database { categories:Category[]; items:Item[]; orders:Order[]; team:TeamMember[]; attendance:Attendance[]; adjustments:PayrollAdjustment[]; payrollRuns:PayrollRun[]; payrollBatches?:PayrollBatch[]; payrollDraft?:PayrollDraft|null; deliveryAreas:DeliveryArea[]; workShifts?:WorkShift[]; activity:ActivityEvent[]; settings:Settings; nextTicket:number; legacyDemoArchive?:unknown; sampleOrderArchive?:Order[]; sampleLaborArchive?:{at:string;attendance:Attendance[];adjustments:PayrollAdjustment[];payrollRuns:PayrollRun[];payrollBatches?:PayrollBatch[]}[]; menuArchives?:{at:string;categories:Category[];items:Item[]}[] }

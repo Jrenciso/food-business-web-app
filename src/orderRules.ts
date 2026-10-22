@@ -28,13 +28,13 @@ export function nextOrderStatuses(order:Order,role:Role,userId:string):Status[]{
  if(role==='chef'||role==='kitchen'){
   if(status==='New')return ['Preparing'];
   if(status==='Preparing')return ['Ready'];
-  if(status==='Ready'&&(type==='pickup'||type==='delivery'))return ['Picked up'];
+  if(status==='Ready'&&(type==='pickup'||type==='take-out'||type==='delivery'))return ['Picked up'];
   return [];
  }
  if(status==='New')return ['Preparing','Cancelled'];
  if(status==='Preparing')return ['Ready','Cancelled'];
- if(status==='Ready')return type==='pickup'?['Picked up','Completed','Cancelled']:type==='delivery'?['Picked up','Cancelled']:['Completed','Cancelled'];
- if(status==='Picked up')return type==='pickup'?['Completed','Cancelled']:type==='delivery'?['Out for delivery','Cancelled']:[];
+ if(status==='Ready')return (type==='pickup'||type==='take-out')?['Picked up','Completed','Cancelled']:type==='delivery'?['Picked up','Cancelled']:['Completed','Cancelled'];
+ if(status==='Picked up')return (type==='pickup'||type==='take-out')?['Completed','Cancelled']:type==='delivery'?['Out for delivery','Cancelled']:[];
  if(status==='Out for delivery'&&type==='delivery')return ['Completed','Cancelled'];
  return [];
 }
