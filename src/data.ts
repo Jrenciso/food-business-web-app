@@ -1,4 +1,4 @@
-import type { Attendance, Database, DeliveryArea, Item, Order, PayBasis, PayrollBatch, PayrollBatchAdjustment, PayrollBatchRow, PayrollRun, RateVersion, Role, TeamMember, WorkShift } from './types';
+import type { Attendance, Database, DeliveryArea, Item, NewOrderDisplaySettings, Order, OrderFieldKey, OrderFieldRules, OrderType, PayBasis, PayrollBatch, PayrollBatchAdjustment, PayrollBatchRow, PayrollRun, RateVersion, Role, TeamMember, WorkShift } from './types';
 import { urbanMenu } from './urbanSeed';
 import { nextOrderStatuses, orderEditUnavailableReason } from './orderRules';
 import { activePaymentMethods, defaultPaymentMethods } from './paymentMethods';
@@ -9,7 +9,42 @@ export const dateTime=(value:string,timezone='Asia/Manila')=>new Intl.DateTimeFo
 export const balance=(o:Order)=>Math.max(0,o.total-collected(o));
 export const collected=(o:Order)=>o.payments.reduce((a,p)=>a+(p.kind==='payment'?p.amount:-p.amount),0);
 export const paymentState=(o:Order)=>{const paid=o.payments.filter(p=>p.kind==='payment').reduce((a,p)=>a+p.amount,0),refunded=o.payments.filter(p=>p.kind==='refund').reduce((a,p)=>a+p.amount,0);return refunded>0&&refunded===paid?'Refunded':collected(o)>=o.total?'Paid':collected(o)>0?'Partially paid':'Unpaid'};
-export const can=(role:Role,action:'pos'|'menu'|'settings'|'reports'|'payment'|'cancel'|'prep'|'deliver'|'staff'|'attendance'|'payroll')=>role==='owner'||(action==='pos'&&(role==='chef'||role==='kitchen'))||(action==='prep'&&(role==='chef'||role==='kitchen'))||(action==='deliver'&&role==='rider');
+export const can=(role:Role,action:'pos'|'menu'|'settings'|'reports'|'payment'|'cancel'|'prep'|'deliver'|'staff'|'attendance'|'payroll')=>role==='owner'||(action==='pos'&&(role==='chef'||role==='kitchen'||role==='rider'))||(action==='prep'&&(role==='chef'||role==='kitchen'))||(action==='deliver'&&role==='rider');
+export const orderFieldKeys:OrderFieldKey[]=['customer','contact','deliveryArea','address','landmark','rider','dineInReference','notes'];
+export const orderFieldLabels:Record<OrderFieldKey,string>={customer:'Customer name',contact:'Mobile / contact number',deliveryArea:'Delivery area',address:'Delivery address',landmark:'Landmark / directions',rider:'Assigned rider',dineInReference:'Table number / dine-in reference',notes:'Order notes / instructions'};
+export function defaultOrderFieldRules():OrderFieldRules{
+ const common={customer:'required',contact:'optional',deliveryArea:'hidden',address:'hidden',landmark:'hidden',rider:'hidden',dineInReference:'hidden',notes:'optional'} as const;
+ return {
+  delivery:{...common,contact:'required',deliveryArea:'required',address:'required',landmark:'optional',rider:'required'},
+  'take-out':{...common},
+  'dine-in':{...common,contact:'hidden',dineInReference:'optional'},
+  pickup:{...common},
+ };
+}
+export function defaultNewOrderDisplaySettings():NewOrderDisplaySettings{return {showImages:true,layout:'tiles',tileSize:'standard',enabledOrderTypes:['pickup','take-out','delivery','dine-in'],orderCreationRoles:['owner','chef','kitchen'],fieldRules:defaultOrderFieldRules()}}
+export function normalizeNewOrderDisplaySettings(input?:Partial<NewOrderDisplaySettings>|null):NewOrderDisplaySettings{
+ const defaults=defaultNewOrderDisplaySettings(),source=input||{};
+ const validTypes=(source.enabledOrderTypes||defaults.enabledOrderTypes).filter((x):x is OrderType=>['pickup','take-out','delivery','dine-in'].includes(x));
+ const validRoles=(source.orderCreationRoles||defaults.orderCreationRoles).filter((x):x is Role=>['owner','chef','kitchen','rider'].includes(x));
+ const baseRules=defaultOrderFieldRules(),fieldRules={...baseRules} as OrderFieldRules;
+ for(const type of ['pickup','take-out','delivery','dine-in'] as OrderType[]){
+  const saved=source.fieldRules?.[type];
+  for(const key of orderFieldKeys){const rule=saved?.[key];if(rule==='required'||rule==='optional'||rule==='hidden')fieldRules[type][key]=rule}
+ }
+ // Delivery fulfillment fields are system requirements. Inapplicable fields
+ // remain hidden regardless of values supplied by stale clients.
+ fieldRules.delivery.deliveryArea='required';fieldRules.delivery.address='required';fieldRules.delivery.rider='required';
+ fieldRules['dine-in'].contact='hidden';
+ for(const type of ['pickup','take-out','dine-in'] as OrderType[]){fieldRules[type].deliveryArea='hidden';fieldRules[type].address='hidden';fieldRules[type].landmark='hidden';fieldRules[type].rider='hidden'}
+ for(const type of ['pickup','take-out','delivery'] as OrderType[])fieldRules[type].dineInReference='hidden';
+ return {...defaults,...source,enabledOrderTypes:validTypes.length?validTypes:defaults.enabledOrderTypes,orderCreationRoles:['owner',...validRoles.filter(role=>role!=='owner')],fieldRules};
+}
+export const canCreateOrders=(role:Role,settings:Database['settings'])=>role==='owner'||normalizeNewOrderDisplaySettings(settings.newOrderDisplay).orderCreationRoles.includes(role);
+export function validateNewOrderFields(order:Order,settings:Database['settings']){
+ const rules=normalizeNewOrderDisplaySettings(settings.newOrderDisplay).fieldRules[order.type];
+ const values:Record<OrderFieldKey,string>={customer:order.customer,contact:order.contact,deliveryArea:order.deliveryAreaId||'',address:order.address,landmark:order.landmark,rider:order.riderId,dineInReference:order.dineInReference||'',notes:order.notes};
+ for(const key of orderFieldKeys){const rule=rules[key],value=values[key]?.trim()||'';if(rule==='required'&&!value)throw Error(`${orderFieldLabels[key]} is required for ${order.type==='take-out'?'Take-out':order.type==='dine-in'?'Dine-in':order.type==='pickup'?'Pickup':'Delivery'}.`);if(rule==='hidden'&&value)throw Error(`${orderFieldLabels[key]} must be cleared for this order type.`)}
+}
 export const rateAt=(employee:TeamMember,date:string):RateVersion|null=>[...employee.rates].filter(r=>r.effectiveDate<=date).sort((a,b)=>b.effectiveDate.localeCompare(a.effectiveDate)||b.recordedAt.localeCompare(a.recordedAt))[0]||null;
 export const monthDays=(date:string)=>{const [y,m]=date.split('-').map(Number);return new Date(y,m,0).getDate()};
 export const accrued=(rate:RateVersion|null,date:string)=>{if(!rate)return 0;if(rate.basis==='daily')return rate.amount;const days=monthDays(date),base=Math.floor(rate.amount/days),remainder=rate.amount-base*days;return base+(Number(date.slice(8))<=remainder?1:0)};
@@ -44,7 +79,7 @@ export const deliveryAreaSeed=():DeliveryArea[]=>[
  ['sonoma','Sonoma',8000],['amaia','Amaia / Phirst Park Pandi',9000],['brighthomes','Brighthomes / Primeville / EPDR / Calle, Malabon / Caysio Pabahay / Caypombo',4000],['pintong','Pintong Bato / Malawak / Sunrays / Villa Corazon',4000],['msapa','M. Sapa',6000]
 ].map(([id,label,fee],order)=>({id:String(id),label:String(label),fee:Number(fee),aliases:'',notes:'',active:true,order}));
 export const workShiftSeed=():WorkShift[]=>[['opening','Opening','08:30','16:30'],['kitchen','Kitchen','09:00','17:00'],['midday','Midday','10:00','18:00'],['rider','Rider','11:00','19:00'],['afternoon','Afternoon','13:00','22:00']].map(([id,name,start,end],order)=>({id,name,start,end,active:true,order}));
-export function seed():Database{const menu=urbanMenu(),today=businessDay(new Date());const team:TeamMember[]=[['owner1','Alex Reyes','owner',0,'monthly'],['chef1','Sam Dela Cruz','chef',90000,'daily'],['kitchen1','Jo Lim','kitchen',65000,'daily'],['rider1','Nico Ramos','rider',55000,'daily']].map(([id,name,role,amount,basis])=>({id:String(id),name:String(name),contact:'',role:role as Role,title:'',active:true,activeFrom:today,activeTo:'',notes:'',rates:[{id:uid(),amount:Number(amount),basis:basis as PayBasis,effectiveDate:today,recordedAt:new Date().toISOString()}]}));return {...menu,items:menu.items.map((i,n)=>({...i,order:i.order??n,favorite:false})),orders:[],team,attendance:[],adjustments:[],payrollRuns:[],payrollBatches:[],payrollDraft:null,deliveryAreas:deliveryAreaSeed(),workShifts:workShiftSeed(),activity:[],settings:{businessName:'Urban Casero',tagline:'One-Stop Snackshop',logo:'',phone:'',address:'',currency:'PHP',timezone:'Asia/Manila',footer:'Thank you for ordering!',defaultDeliveryFee:4500,accent:'#be7934',theme:'light',activeUserId:'owner1',dataMode:'sample',tileSizes:{},newOrderDisplay:{showImages:true,layout:'tiles',tileSize:'standard',enabledOrderTypes:['pickup','take-out','delivery','dine-in']},payrollSchedule:'weekly',payrollCutoff:15,paymentMethods:defaultPaymentMethods()},nextTicket:1001}}
+export function seed():Database{const menu=urbanMenu(),today=businessDay(new Date());const team:TeamMember[]=[['owner1','Alex Reyes','owner',0,'monthly'],['chef1','Sam Dela Cruz','chef',90000,'daily'],['kitchen1','Jo Lim','kitchen',65000,'daily'],['rider1','Nico Ramos','rider',55000,'daily']].map(([id,name,role,amount,basis])=>({id:String(id),name:String(name),contact:'',role:role as Role,title:'',active:true,activeFrom:today,activeTo:'',notes:'',rates:[{id:uid(),amount:Number(amount),basis:basis as PayBasis,effectiveDate:today,recordedAt:new Date().toISOString()}]}));return {...menu,items:menu.items.map((i,n)=>({...i,order:i.order??n,favorite:false})),orders:[],team,attendance:[],adjustments:[],payrollRuns:[],payrollBatches:[],payrollDraft:null,deliveryAreas:deliveryAreaSeed(),workShifts:workShiftSeed(),activity:[],settings:{businessName:'Urban Casero',tagline:'One-Stop Snackshop',logo:'',phone:'',address:'',currency:'PHP',timezone:'Asia/Manila',footer:'Thank you for ordering!',defaultDeliveryFee:4500,accent:'#be7934',theme:'light',activeUserId:'owner1',dataMode:'sample',tileSizes:{},newOrderDisplay:defaultNewOrderDisplaySettings(),payrollSchedule:'weekly',payrollCutoff:15,paymentMethods:defaultPaymentMethods()},nextTicket:1001}}
 export function archiveSampleLabor(d:Database){if(!d.attendance.length&&!d.adjustments.length&&!d.payrollRuns.length&&!d.payrollBatches?.length)return;d.sampleLaborArchive=[...(d.sampleLaborArchive||[]),{at:new Date().toISOString(),attendance:d.attendance,adjustments:d.adjustments,payrollRuns:d.payrollRuns,payrollBatches:d.payrollBatches||[]}];d.attendance=[];d.adjustments=[];d.payrollRuns=[];d.payrollBatches=[];d.payrollDraft=null}
 const LEGACY_KEY='urban-ops-v1',OLD_KEY='salo-counter-v2',workspaceKey=(w:'sample'|'live')=>`urban-ops-workspace-${w}-v1`;
 export const activeWorkspace=()=>localStorage.getItem('urban-ops-active-workspace')==='live'?'live' as const:'sample' as const;
@@ -150,6 +185,13 @@ function validateOperationalMutation(before:Database,after:Database,actor:TeamMe
   }
  }
  if(action==='settings'){
+  const raw=after.settings.newOrderDisplay;
+  if(!raw||!Array.isArray(raw.orderCreationRoles)||!raw.orderCreationRoles.includes('owner'))throw Error('Owner order access must remain enabled.');
+  for(const type of ['pickup','take-out','delivery','dine-in'] as OrderType[]){const rules=raw.fieldRules?.[type];if(!rules)throw Error('Order field settings are incomplete.');for(const key of orderFieldKeys)if(!['required','optional','hidden'].includes(rules[key]))throw Error('Choose Required, Optional, or Hidden for every order field.');}
+  if(raw.fieldRules.delivery.deliveryArea!=='required'||raw.fieldRules.delivery.address!=='required'||raw.fieldRules.delivery.rider!=='required')throw Error('Delivery area, address, and assigned rider are required system fields.');
+  if(raw.fieldRules['dine-in'].contact!=='hidden')throw Error('Dine-in orders do not collect a contact number.');
+  const normalized=normalizeNewOrderDisplaySettings(raw);
+  if(JSON.stringify(normalized)!==JSON.stringify(raw))throw Error('New order settings contain unsupported roles, types, or field rules.');
   const methods=after.settings.paymentMethods||[],methodIds=new Set<string>(),methodLabels=new Set<string>();
   for(const original of before.settings.paymentMethods||[])if(!methods.some(m=>m.id===original.id))throw Error('Disable a payment method instead of deleting it.');
   for(const method of methods){const label=method.label.trim().toLowerCase();if(!method.id||!label||methodIds.has(method.id)||methodLabels.has(label)||!Number.isSafeInteger(method.order))throw Error('Payment methods need unique names and valid order.');methodIds.add(method.id);methodLabels.add(label)}
@@ -169,10 +211,15 @@ function validateOperationalMutation(before:Database,after:Database,actor:TeamMe
    const added=after.orders.filter(o=>!before.orders.some(x=>x.id===o.id));
    if(after.orders.length!==before.orders.length+1||added.length!==1||before.orders.some(o=>JSON.stringify(after.orders.find(x=>x.id===o.id))!==JSON.stringify(o)))throw Error('Staff may create one new ticket at a time.');
    const enabled=after.settings.newOrderDisplay?.enabledOrderTypes||['pickup','take-out','delivery','dine-in'];
+   if(!canCreateOrders(actor.role,after.settings))throw Error('Your role is not allowed to create new orders. Ask the owner to enable this access in Settings.');
    if(!enabled.includes(added[0].type))throw Error('This order type is disabled in New order settings.');
    if(added[0].status!=='New'||added[0].payments.length||added[0].sample)throw Error('Staff tickets must start new, unpaid, and live.');
+   validateNewOrderFields(added[0],after.settings);
+   if(actor.role==='rider'&&added[0].type==='delivery'&&added[0].riderId!==actor.id)throw Error('Rider-created deliveries must be assigned to the signed-in rider.');
    return;
   }
+  for(const original of before.orders){const current=after.orders.find(o=>o.id===original.id);if(current&&JSON.stringify(current)!==JSON.stringify(original)&&current.type!==original.type)validateNewOrderFields(current,after.settings)}
+  for(const order of after.orders.filter(o=>!before.orders.some(x=>x.id===o.id)))validateNewOrderFields(order,after.settings);
   }
  }
  if(action==='payment')for(const original of before.orders){const current=after.orders.find(o=>o.id===original.id);if(!current)throw Error('Order payment history cannot be deleted.');if(JSON.stringify(current.payments.slice(0,original.payments.length))!==JSON.stringify(original.payments))throw Error('Existing payment records cannot be changed.');for(const payment of current.payments.slice(original.payments.length))if(payment.kind==='payment'&&!activePaymentMethods(after.settings).some(m=>m.id===payment.method&&m.label===payment.methodLabel))throw Error('Choose an enabled payment method.');}
@@ -232,7 +279,7 @@ export const db={load(workspace:'sample'|'live'=activeWorkspace()):Database{
  fresh.payrollBatches??=migratePayrollRuns(fresh);
  fresh.payrollDraft??=null;
  fresh.items=fresh.items.map((i,n)=>({...i,order:i.order??n,favorite:i.favorite??false}));
- fresh.settings.tileSizes??={};fresh.settings.newOrderDisplay??={showImages:true,layout:'tiles',tileSize:'standard',enabledOrderTypes:['pickup','take-out','delivery','dine-in']};fresh.settings.newOrderDisplay.enabledOrderTypes??=['pickup','take-out','delivery','dine-in'];if(!fresh.settings.newOrderDisplay.enabledOrderTypes.length)fresh.settings.newOrderDisplay.enabledOrderTypes=['pickup','take-out','delivery','dine-in'];if(!fresh.settings.newOrderDisplay.enabledOrderTypes.includes('take-out'))fresh.settings.newOrderDisplay.enabledOrderTypes.push('take-out');delete (fresh.settings.newOrderDisplay as unknown as Record<string,unknown>).defaultOrderType;fresh.settings.payrollSchedule??='weekly';fresh.settings.payrollCutoff??=15;fresh.settings.paymentMethods??=defaultPaymentMethods();fresh.settings.dataMode=workspace;
+ fresh.settings.tileSizes??={};fresh.settings.newOrderDisplay=normalizeNewOrderDisplaySettings(fresh.settings.newOrderDisplay);delete (fresh.settings.newOrderDisplay as unknown as Record<string,unknown>).defaultOrderType;fresh.settings.payrollSchedule??='weekly';fresh.settings.payrollCutoff??=15;fresh.settings.paymentMethods??=defaultPaymentMethods();fresh.settings.dataMode=workspace;
  this.save(fresh);return fresh
-},save(data:Database){localStorage.setItem(workspaceKey(data.settings.dataMode),JSON.stringify(data))},prepareMutation(data:Database,role:Role,action:Parameters<typeof can>[1],fn:(draft:Database)=>void,actor:TeamMember){if(!can(role,action)){throw Error('Role is not allowed to perform this action')}const draft=structuredClone(data);fn(draft);validateOperationalMutation(data,draft,actor,action);return draft},mutate(data:Database,role:Role,action:Parameters<typeof can>[1],fn:(draft:Database)=>void,actor:TeamMember){const draft=this.prepareMutation(data,role,action,fn,actor);this.save(draft);return draft},resetSampleMenu(data:Database){const draft=structuredClone(data);const menu=urbanMenu();draft.categories=menu.categories;draft.items=menu.items;this.save(draft);return draft},clearSampleOrders(data:Database){const draft=structuredClone(data);draft.orders=draft.orders.filter(o=>!o.sample);this.save(draft);return draft}};
+},save(data:Database){localStorage.setItem(workspaceKey(data.settings.dataMode),JSON.stringify(data))},prepareMutation(data:Database,role:Role,action:Parameters<typeof can>[1],fn:(draft:Database)=>void,actor:TeamMember){if(!can(role,action)){throw Error('Role is not allowed to perform this action')}if(action==='pos'&&!canCreateOrders(role,data.settings))throw Error('Your role is not allowed to create new orders. Ask the owner to enable this access in Settings.');const draft=structuredClone(data);fn(draft);validateOperationalMutation(data,draft,actor,action);return draft},mutate(data:Database,role:Role,action:Parameters<typeof can>[1],fn:(draft:Database)=>void,actor:TeamMember){const draft=this.prepareMutation(data,role,action,fn,actor);this.save(draft);return draft},resetSampleMenu(data:Database){const draft=structuredClone(data);const menu=urbanMenu();draft.categories=menu.categories;draft.items=menu.items;this.save(draft);return draft},clearSampleOrders(data:Database){const draft=structuredClone(data);draft.orders=draft.orders.filter(o=>!o.sample);this.save(draft);return draft}};
 

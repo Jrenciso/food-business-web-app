@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Download, Pencil, X } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { useApp } from './AppContext';
-import { balance, collected, dateTime, money, paymentState } from './data';
+import { balance, collected, dateTime, money, normalizeNewOrderDisplaySettings, paymentState } from './data';
 import type { Order } from './types';
 
 const message=(order:Order)=>({
@@ -25,7 +25,7 @@ interface OrderUpdateProps {
 
 export default function OrderUpdate({order,onClose,onGoToOrders,onEdit,editUnavailableReason}:OrderUpdateProps){
  const {data,notify}=useApp(),settings=data.settings,card=useRef<HTMLDivElement>(null),dialog=useRef<HTMLDivElement>(null),goToOrdersButton=useRef<HTMLButtonElement>(null),[busy,setBusy]=useState(false);
- const currency=settings.currency,payment=paymentState(order);
+ const currency=settings.currency,payment=paymentState(order),rules=normalizeNewOrderDisplaySettings(settings.newOrderDisplay).fieldRules[order.type];
  const onCloseRef=useRef(onClose);onCloseRef.current=onClose;
 
  useEffect(()=>{
@@ -75,7 +75,7 @@ export default function OrderUpdate({order,onClose,onGoToOrders,onEdit,editUnava
      {order.sample&&<span className="sample-tag">SAMPLE / TEST</span>}
      <div className="update-kicker">ORDER UPDATE</div><h2>Ticket #{order.number}</h2>
      <div className="update-status">{order.status}</div><p>{message(order)}</p>
-     <div className="update-details"><div><span>Order type</span><strong>{order.type==='pickup'?'Pickup':order.type==='take-out'?'Take-out':order.type==='dine-in'?'Dine-in':'Delivery'}</strong></div>{order.type==='delivery'&&<><div><span>Delivery area</span><strong>{order.deliveryAreaLabel||'Not specified'}</strong></div>{order.address&&<div><span>Delivery address</span><strong>{order.address}{order.landmark&&` · ${order.landmark}`}</strong></div>}</>}{order.type==='dine-in'&&order.dineInReference&&<div><span>Table / reference</span><strong>{order.dineInReference}</strong></div>}<div><span>Updated</span><strong>{dateTime(order.statusHistory[order.statusHistory.length-1]?.at||order.createdAt,settings.timezone)}</strong></div></div>
+     <div className="update-details"><div><span>Order type</span><strong>{order.type==='pickup'?'Pickup':order.type==='take-out'?'Take-out':order.type==='dine-in'?'Dine-in':'Delivery'}</strong></div>{order.type==='delivery'&&<><div><span>Delivery area</span><strong>{order.deliveryAreaLabel||'Not specified'}</strong></div>{order.address&&<div><span>Delivery address</span><strong>{order.address}</strong></div>}{order.landmark&&rules.landmark!=='hidden'&&<div><span>Landmark / directions</span><strong>{order.landmark}</strong></div>}</>}{order.type==='dine-in'&&order.dineInReference&&rules.dineInReference!=='hidden'&&<div><span>Table / reference</span><strong>{order.dineInReference}</strong></div>}<div><span>Updated</span><strong>{dateTime(order.statusHistory[order.statusHistory.length-1]?.at||order.createdAt,settings.timezone)}</strong></div></div>
      <section className="update-items" aria-label="Items ordered"><h3>Items ordered</h3>{order.lines.map((line,index)=><div className="update-item" key={`${line.itemId}-${index}`}><div><strong>{line.quantity}× {line.name}</strong>{line.flavors?.length?<small>Flavors: {line.flavors.join(', ')}</small>:null}</div><b>{money(line.unitPrice*line.quantity,currency)}</b></div>)}</section>
      <div className="update-totals"><div><span>Subtotal</span><strong>{money(order.subtotal,currency)}</strong></div>{order.discount>0&&<div><span>Discount</span><strong>−{money(order.discount,currency)}</strong></div>}{order.type==='delivery'&&<div><span>Delivery fee</span><strong>{money(order.deliveryFee,currency)}</strong></div>}<div className="update-grand-total"><span>Total</span><strong>{money(order.total,currency)}</strong></div></div>
      <div className="update-payment"><div><span>Payment status</span><span className={`payment-badge ${payment.toLowerCase().replaceAll(' ','-')}`}>{payment.toUpperCase()}</span></div><div><span>Amount collected</span><strong>{money(collected(order),currency)}</strong></div><div><span>Remaining balance</span><strong>{money(balance(order),currency)}</strong></div></div>
