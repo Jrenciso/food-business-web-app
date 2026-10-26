@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useApp } from './AppContext';
+import { moduleEnabled } from './operations';
+import ManualPayroll from './ManualPayroll';
 import PayrollRegisterPreview from './PayrollRegisterPreview';
 import { PayrollPaymentTracking, PayrollPayslip, SavedPayrollRegister } from './PayrollSavedViews';
 import { payrollPeriods } from './payrollPeriods';
@@ -15,7 +17,8 @@ const hours=(n:number)=>`${Math.floor(n/60)}h ${n%60}m`;
 const activeIds=(team:TeamMember[])=>team.filter(e=>e.active).map(e=>e.id);
 const sum=(numbers:number[])=>numbers.reduce((a,b)=>a+b,0);
 
-export default function Payroll(){
+export default function Payroll(){const {data}=useApp();return moduleEnabled(data,'attendance')?<StandardPayroll/>:<ManualPayroll/>}
+function StandardPayroll(){
  const {data,commit,notify,setPage,setAttendanceDate}=useApp(),settings=data.settings,today=businessDay(new Date(),'Asia/Manila'),periods=payrollPeriods(settings,today).filter(period=>data.attendance.some(a=>a.worked&&a.date>=period.from&&a.date<=period.to&&!payrollAssignment(data,a.employeeId,a.date)));
  const initial:PayrollDraft=data.payrollDraft||{preset:'schedule',from:periods[0]?.from||today,to:periods[0]?.to||today,employeeIds:activeIds(data.team),adjustments:{}};
  const [stage,setStage]=useState<Stage>('home'),[draft,setDraft]=useState<PayrollDraft>(initial),[selectedIds,setSelectedIds]=useState<string[]>(initial.employeeIds),[finalIds,setFinalIds]=useState<string[]>(initial.employeeIds),[batchId,setBatchId]=useState(''),[detailId,setDetailId]=useState(''),[adjustFor,setAdjustFor]=useState(''),[adjustId,setAdjustId]=useState(''),[adjustKind,setAdjustKind]=useState<'earning'|'deduction'>('earning'),[adjustAmount,setAdjustAmount]=useState(''),[adjustReason,setAdjustReason]=useState('');

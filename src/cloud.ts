@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { seed } from './data';
 import type { Database, Role } from './types';
+import type { PaymentEntryValue } from './PaymentEntry';
 
 const env=import.meta.env;
 const url=env.VITE_SUPABASE_URL?.trim();
@@ -19,6 +20,8 @@ export interface CloudBusiness { business_id:string;business_name:string;member_
 export interface CloudSnapshot { data:Database;revision:number;role:Role;employeeId:string|null;displayName:string;accessStatus?:'linked'|'pending'|'disabled' }
 export interface StaffAccount { username:string;employee_id:string;must_change_password:boolean;active:boolean }
 export interface RiderLocation {employeeId:string;name:string;orderId:string|null;latitude:number|null;longitude:number|null;accuracy:number|null;updatedAt:string|null;sessionSeenAt:string|null;sharing:boolean;status:'sharing'|'waiting'|'paused'|'offline'}
+export interface MonitorOrder {id:string;number:string;createdAt:string;businessDate?:string;type:'pickup'|'take-out'|'delivery'|'dine-in';status:'New'|'Preparing'|'Ready'|'Picked up'|'Out for delivery'|'Completed'|'Cancelled';statusHistory:{status:string;at:string}[];lines:{name:string;quantity:number}[];riderId:string}
+export interface LiveMonitorSnapshot {businessName:string;timezone:string;businessDayCutoff:string;businessDate:string;serverTime:string;registerEnabled:boolean;orders:MonitorOrder[];riders:{id:string;name:string}[]}
 export function emptyLiveWorkspace():Database{
  const fresh=seed();
  return {...fresh,categories:[],items:[],orders:[],team:[],attendance:[],adjustments:[],payrollRuns:[],
@@ -27,6 +30,7 @@ export function emptyLiveWorkspace():Database{
    activeUserId:'',dataMode:'live'}};
 }
 export const cloud={
+ async registerFeatureReady():Promise<boolean>{const {data,error}=await client().rpc('register_feature_ready');if(error?.code==='PGRST202')return false;if(error)throw Error(error.message);return data===true},
  async uploadMenuImage(businessId:string,itemId:string,file:Blob):Promise<string>{
   const path=`${businessId}/${itemId}/${crypto.randomUUID()}.webp`;
   const {error}=await client().storage.from('menu-item-images').upload(path,file,{contentType:'image/webp',upsert:false,cacheControl:'3600'});
@@ -59,6 +63,7 @@ export const cloud={
  async setRiderLocation(businessId:string,orderId:string|null,latitude:number,longitude:number,accuracy:number){const {error}=await client().rpc('set_rider_location',{p_business_id:businessId,p_order_id:orderId,p_latitude:latitude,p_longitude:longitude,p_accuracy:accuracy});if(error)throw Error(error.message)},
  async setRiderSharing(businessId:string,sharing:boolean){const {error}=await client().rpc('set_rider_sharing',{p_business_id:businessId,p_sharing:sharing});if(error)throw Error(error.message)},
  async stopRiderLocation(businessId:string){const {error}=await client().rpc('stop_rider_location',{p_business_id:businessId});if(error)throw Error(error.message)},
+ async riderCollectionV2(businessId:string,orderId:string,value:PaymentEntryValue,requestId:string){const result=await client().rpc('record_rider_collection_v2',{p_business_id:businessId,p_order_id:orderId,p_amount:value.amount,p_method:value.method,p_reference:value.reference,p_tendered:value.tenderedAmount??null,p_change:value.changeAmount??null,p_cash_confirmed:value.cashConfirmed??false,p_request_id:requestId});if(result.error?.code==='PGRST202'){if(value.method==='cash')throw Error('Cash tender and change require the new database migration before rider collection can be saved.');return this.riderCollection(businessId,orderId,value.amount,value.method,value.reference,requestId)}return unwrap(result)},
  async riderCollection(businessId:string,orderId:string,amount:number,method:string,reference:string,requestId:string){return unwrap(await client().rpc('record_rider_collection',{p_business_id:businessId,p_order_id:orderId,p_amount:amount,p_method:method,p_reference:reference,p_request_id:requestId}))},
  async session(){const {data,error}=await client().auth.getUser();if(error&&error.name!=='AuthSessionMissingError')throw Error(error.message);return {user:data.user}},
  async signIn(email:string,password:string){const {data,error}=await client().auth.signInWithPassword({email,password});if(error)throw Error(error.message);if(!data.user||!data.session)throw Error('Sign-in did not create a session.');return data},
@@ -68,7 +73,9 @@ export const cloud={
  async businesses():Promise<CloudBusiness[]>{return unwrap(await client().rpc('my_businesses')) as CloudBusiness[]},
  async createBusiness(name:string):Promise<string>{const initial=emptyLiveWorkspace();initial.settings.businessName=name.trim();return unwrap(await client().rpc('create_business',{p_name:name.trim(),p_initial:initial})) as string},
  async read(businessId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc('read_operations',{p_business_id:businessId})) as CloudSnapshot},
- async apply(businessId:string,revision:number,action:string,next:Database,requestId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc('apply_operations',{p_business_id:businessId,p_expected_revision:revision,p_action:action,p_next:next,p_request_id:requestId})) as CloudSnapshot},
+ async readLiveOrderMonitor(businessId:string):Promise<LiveMonitorSnapshot>{return unwrap(await client().rpc('read_live_order_monitor',{p_business_id:businessId})) as LiveMonitorSnapshot},
+ async apply(businessId:string,revision:number,action:string,next:Database,requestId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc(action==='register'?'apply_register_operations':'apply_operations',{p_business_id:businessId,p_expected_revision:revision,...(action==='register'?{}:{p_action:action}),p_next:next,p_request_id:requestId})) as CloudSnapshot},
+ async finalizeCheckout(businessId:string,revision:number,next:Database,payment:PaymentEntryValue,requestId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc('finalize_pos_checkout',{p_business_id:businessId,p_expected_revision:revision,p_next:next,p_payment:payment,p_request_id:requestId})) as CloudSnapshot},
  async staffOrder(businessId:string,revision:number,next:Database,requestId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc('apply_staff_order',{p_business_id:businessId,p_expected_revision:revision,p_next:next,p_request_id:requestId})) as CloudSnapshot},
  async saveEmployeeAccess(businessId:string,revision:number,next:Database,requestId:string,email:string,role:Role,employeeId:string,active:boolean):Promise<CloudSnapshot>{return unwrap(await client().rpc('save_employee_access',{p_business_id:businessId,p_expected_revision:revision,p_next:next,p_request_id:requestId,p_email:email,p_role:role,p_employee_id:employeeId,p_active:active})) as CloudSnapshot},
  async importLocal(businessId:string,revision:number,local:Database,requestId:string):Promise<CloudSnapshot>{return unwrap(await client().rpc('import_local_operations',{p_business_id:businessId,p_expected_revision:revision,p_import:local,p_request_id:requestId})) as CloudSnapshot},

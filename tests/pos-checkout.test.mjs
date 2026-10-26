@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+
+const bundle=await build({entryPoints:['src/CheckoutPayment.tsx'],bundle:true,platform:'node',format:'esm',write:false,jsx:'automatic'});
+const checkout=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const methods=[{id:'cash',label:'Cash',active:true,order:0},{id:'gcash',label:'GCash',active:true,order:1}];
+const unpaidDraft=checkout.emptyCheckoutPaymentDraft(44000,methods);
+assert.equal(unpaidDraft.method,'cash','checkout defaults to cash when enabled');
+assert.equal(unpaidDraft.tender,'0.00','checkout starts with no cash tender');
+assert.equal(checkout.hasCheckoutPaymentIntent(unpaidDraft,methods),false,'zero payment draft is a valid unpaid checkout');
+assert.equal(checkout.checkoutPaymentValue(unpaidDraft,44000,methods),null,'unpaid checkout must not create a payment');
+let draft={...checkout.emptyCheckoutPaymentDraft(44000),method:'cash',tender:'500.00',cashConfirmed:true};
+assert.deepEqual(checkout.checkoutPaymentValue(draft,44000,methods),{amount:44000,method:'cash',methodLabel:'Cash',reference:'',tenderedAmount:50000,changeAmount:6000,cashConfirmed:true});
+draft={...draft,tender:'200.00'};
+assert.equal(checkout.checkoutPaymentValue(draft,44000,methods)?.amount,20000,'partial cash must apply only tendered amount');
+assert.equal(checkout.checkoutPaymentValue({...draft,cashConfirmed:false},44000,methods),null,'cash handoff confirmation is required');
+draft={...checkout.emptyCheckoutPaymentDraft(44000),method:'gcash',amount:'150.00'};
+assert.deepEqual(checkout.checkoutPaymentValue(draft,44000,methods),{amount:15000,method:'gcash',methodLabel:'GCash',reference:''});
+assert.equal(checkout.checkoutPaymentValue({...draft,amount:'500.00'},44000,methods),null,'overpayment must be rejected');
+assert.equal(checkout.checkoutPaymentValue({...draft,method:'disabled'},44000,methods),null,'disabled payment method must be rejected');
+const noCash=[{id:'gcash',label:'GCash',active:true,order:0}];
+assert.equal(checkout.emptyCheckoutPaymentDraft(44000,noCash).method,'gcash','checkout defaults to first enabled method if cash is disabled');
+console.log('POS checkout payment calculation checks passed');

@@ -1,0 +1,278 @@
+/* Urban Casero shared design system.
+   Keep brand/accent and light/dark palette values owned by Settings/AppContext. */
+:root {
+  --ds-font-body: 'DM Sans', 'Segoe UI', Arial, sans-serif;
+  --ds-font-display: 'Outfit', 'Segoe UI', Arial, sans-serif;
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+  --ds-radius-sm: 8px;
+  --ds-radius-control: 11px;
+  --ds-radius-card: 16px;
+  --ds-radius-dialog: 20px;
+  --ds-focus: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  --ds-shadow-card: 0 8px 24px rgba(42, 35, 27, .055);
+  --ds-shadow-dialog: 0 24px 76px rgba(20, 22, 20, .28);
+  --ds-text-secondary: color-mix(in srgb, var(--ink) 70%, var(--surface));
+  font-family: var(--ds-font-body);
+  font-size: 16px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { font-family: var(--ds-font-body); font-size: 15px; line-height: 1.55; letter-spacing: .005em; }
+button, input, select, textarea { font: inherit; }
+button { line-height: 1.35; }
+button:disabled { cursor: not-allowed; }
+h1, h2, h3, h4 { font-family: var(--ds-font-display); line-height: 1.2; letter-spacing: -.018em; }
+h1 { font-size: clamp(26px, 2vw, 32px); font-weight: 700; }
+h2 { font-size: clamp(22px, 1.6vw, 26px); font-weight: 700; }
+h3 { font-size: clamp(18px, 1.25vw, 20px); font-weight: 650; }
+h4 { font-size: 15px; font-weight: 700; }
+p { line-height: 1.6; }
+small { font-size: 12px; line-height: 1.45; }
+.muted, .current-time, .section-head p, .page-heading p { color: var(--ds-text-secondary); }
+
+/* App shell and navigation */
+.sidebar { width: 248px; padding: 24px 16px 18px; }
+.main { margin-left: 248px; }
+.brand { padding-bottom: 28px; }
+.brand strong { letter-spacing: .01em; line-height: 1.1; }
+.brand small { letter-spacing: .12em; line-height: 1.35; }
+.sidebar nav { gap: 5px; }
+.nav-link { min-height: 46px; border-radius: 11px; font-size: 14px; }
+.nav-link:focus-visible { outline-offset: 2px; }
+.topbar { min-height: 82px; height: auto; padding: 15px clamp(20px, 2.2vw, 34px); gap: 18px; }
+.topbar-right { gap: 14px; }
+.topbar .eyebrow, .sidebar-label, .eyebrow { font-size: 10px; line-height: 1.4; letter-spacing: .16em; }
+.role-pill { min-height: 36px; display: inline-flex; align-items: center; font-size: 12px; }
+.sample-banner { padding: 10px clamp(20px, 2.2vw, 34px); font-size: 13px; line-height: 1.5; }
+.page-pad, .pos-menu { padding: clamp(22px, 2.2vw, 34px) clamp(18px, 2.2vw, 34px) 52px; }
+.page-heading { margin-bottom: 20px; }
+.page-heading p, .section-head p { font-size: 14px; margin-top: 5px; }
+.surface-head { margin-bottom: 16px; }
+
+/* Shared surfaces, tables, feedback, and controls */
+.surface, .form-surface, .metric, .item-card, .ticket-card, .order-list-group,
+.tracking-panel, .staff-card, .attendance-explorer, .trend-panel,
+.report-payment-methods, .accounting-panel {
+  border-radius: var(--ds-radius-card);
+  box-shadow: var(--ds-shadow-card);
+}
+.surface, .form-surface { padding: clamp(18px, 2vw, 26px); }
+.metric { padding: 18px; }
+.metric span { font-size: 13px; line-height: 1.45; }
+.metric strong { font-size: clamp(20px, 1.8vw, 26px); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.metric-grid { gap: 14px; }
+.toolbar { gap: 12px; margin-block: 18px; }
+.search-box { min-height: 48px; border-radius: 12px; }
+.search-box input { min-height: 44px; font-size: 15px; }
+input, select, textarea { min-width: 0; border-radius: var(--ds-radius-control); font-size: 14px; line-height: 1.45; }
+input:not([type=checkbox]):not([type=radio]), select { min-height: 46px; }
+textarea { min-height: 104px; resize: vertical; line-height: 1.55; }
+label { gap: 7px; font-size: 13px; line-height: 1.4; font-weight: 650; }
+input:focus, select:focus, textarea:focus { box-shadow: var(--ds-focus); }
+input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 68%, white); outline-offset: 2px; }
+.primary, .outline, .text-btn, .icon-btn { min-height: 42px; border-radius: 10px; font-weight: 700; transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease; }
+.primary, .outline { padding: 10px 15px; font-size: 14px; }
+.primary:hover, .outline:hover { box-shadow: 0 4px 14px rgba(44, 36, 27, .10); }
+.small { min-height: 38px; }
+.table-wrap { border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--ds-shadow-card); }
+table { border-collapse: separate; border-spacing: 0; font-size: 14px; }
+th { font-size: 11px; line-height: 1.4; letter-spacing: .06em; }
+td, th { padding: 12px 14px; }
+td { line-height: 1.45; }
+.toast { border-radius: 12px; font-size: 14px; line-height: 1.45; box-shadow: 0 14px 38px rgba(0,0,0,.20); }
+.empty { padding: 28px 18px; border: 1px dashed var(--line); border-radius: 14px; font-size: 14px; }
+
+/* POS keeps the menu and live ticket distinct, with a usable cart at each width. */
+.pos-layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 390px); gap: 0; }
+.pos-menu { min-width: 0; }
+.cart-panel { max-height: calc(100dvh - 82px); }
+.cart-title { padding: 18px 20px; }
+.cart-scroll { padding: 16px 20px; }
+.item-grid { gap: 14px; }
+.item-card { overflow: hidden; }
+.item-content { padding: 14px; }
+.item-content strong { font-size: 16px; line-height: 1.3; }
+.item-content p { font-size: 13px; line-height: 1.45; }
+.item-content b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.item-add { width: 40px; height: 40px; }
+
+/* Orders board/list and ticket data */
+.order-status-nav { gap: 8px; padding: 11px 13px; border-radius: 14px; }
+.order-status-nav button { min-height: 44px; padding: 9px 13px; border-radius: 10px; font-size: 13px; }
+.order-status-lane { border-radius: 15px; }
+.order-status-lane-head { padding: 15px 16px; }
+.order-status-lane-head h3 { font-size: 18px; }
+.order-status-lane-head p { font-size: 13px; line-height: 1.4; }
+.order-status-count { min-width: 34px; min-height: 34px; font-size: 14px; }
+.order-status-lane-cards { gap: 12px; padding: 12px; }
+.order-status-lane-cards .ticket-card { padding: 16px; border-radius: 14px; }
+.ticket-card .ticket-number-button { font-size: 22px; line-height: 1.15; font-weight: 750; }
+.ticket-card .ticket-meta { font-size: 12px; line-height: 1.45; }
+.ticket-card .ticket-customer { font-size: 14px; }
+.ticket-card .ticket-items { font-size: 13px; line-height: 1.5; }
+.ticket-card .ticket-bottom strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.ticket-rider-assignment { font-size: 12px; line-height: 1.4; }
+.ticket-note { padding: 10px 12px; border-radius: 10px; line-height: 1.5; }
+.order-list-groups { gap: 16px; }
+.order-list-group-head { padding: 14px 18px; }
+.order-list-group-head h3 { font-size: 18px; }
+.order-list-group-head p { font-size: 13px; }
+.order-list-columns { font-size: 11px; }
+.order-list-row { min-height: 58px; padding: 13px 16px; font-size: 13px; line-height: 1.45; }
+.badge, .order-type-badge, .payment-badge, .payroll-status-badge { min-height: 24px; font-size: 11px; line-height: 1.3; font-weight: 750; }
+
+/* Dialogs: stable frame, a single scroll region, visible action area. */
+.modal-backdrop { padding: 20px; backdrop-filter: blur(3px); }
+.modal { width: min(760px, 100%); max-height: min(92dvh, 980px); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--ds-radius-dialog); box-shadow: var(--ds-shadow-dialog); }
+.modal-head { flex: none; min-height: 64px; padding: 16px 24px; }
+.modal-head h2 { margin: 0; font-size: 20px; }
+.modal-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 22px 24px; }
+.modal-actions { flex: none; position: sticky; bottom: 0; z-index: 2; flex-wrap: wrap; padding: 13px 24px calc(13px + env(safe-area-inset-bottom)); background: var(--surface); }
+.modal:has(.detail-grid) { width: min(1040px, calc(100vw - 40px)); max-height: min(94dvh, 1000px); }
+.modal:has(.detail-grid) .modal-head { min-height: 68px; padding: 18px 28px; }
+.modal:has(.detail-grid) .modal-head h2 { font-size: 22px; }
+.modal:has(.detail-grid) .modal-body { padding: 24px 28px; }
+.modal:has(.detail-grid) .detail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr); gap: 32px; margin-top: 22px; }
+.modal:has(.detail-grid) .detail-grid h4 { margin: 0 0 10px; font-size: 15px; }
+.modal:has(.detail-grid) .detail-grid p, .modal:has(.detail-grid) .detail-grid small { font-size: 14px; line-height: 1.55; }
+.modal:has(.detail-grid) .detail-line { gap: 14px; padding: 10px 0; font-size: 14px; line-height: 1.45; }
+.modal:has(.detail-grid) .detail-totals { margin-top: 17px; padding: 15px 18px; border-radius: 12px; }
+.modal:has(.detail-grid) .detail-totals > div { padding: 4px 0; font-size: 14px; line-height: 1.45; }
+.modal:has(.detail-grid) .detail-totals > div:last-child strong { font-size: 17px; }
+.modal:has(.detail-grid) .payment-row { gap: 16px; padding: 12px 0; font-size: 13px; line-height: 1.5; }
+.modal:has(.detail-grid) .payment-row small { display: block; margin-top: 3px; font-size: 12px; }
+.modal:has(.detail-grid) .history > div { min-height: 26px; font-size: 13px; }
+.modal:has(.detail-grid) .detail-actions { gap: 9px; margin-top: 18px; }
+.payment-state-banner { --payment-state-color: var(--ds-text-secondary); display: grid; gap: 3px; margin: 14px 0 12px; padding: 12px 15px; border: 1px solid color-mix(in srgb, var(--payment-state-color) 32%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--payment-state-color) 10%, var(--surface)); }
+.payment-state-banner strong { color: var(--payment-state-color); font-size: 15px; line-height: 1.35; }
+.payment-state-banner span { color: var(--ds-text-secondary); font-size: 13px; line-height: 1.45; }
+.payment-state-banner.paid { --payment-state-color: #27623e; }
+.payment-state-banner.partially-paid { --payment-state-color: #385b8c; }
+.payment-state-banner.unpaid { --payment-state-color: #825917; }
+.payment-state-banner.refunded { --payment-state-color: #6b4b89; }
+.modal:has(.payment-state-banner) .payment-state-banner + h4 { margin-top: 17px; }
+.multiline-field textarea { display: block; width: 100%; min-height: 108px; line-height: 1.55; overflow-wrap: anywhere; }
+.refund-section { display: grid; gap: 12px; margin-top: 14px; }
+.refund-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface2); }
+.refund-summary > div { display: grid; gap: 3px; }
+.refund-summary strong { font-size: 14px; }
+.refund-summary span { color: var(--ds-text-secondary); font-size: 13px; }
+.refund-toggle { flex: none; }
+.refund-form { display: grid; grid-template-columns: minmax(180px, .72fr) minmax(0, 1.28fr); align-items: end; gap: 14px; margin-top: 0; padding: 17px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface2); }
+.refund-form .payment-form-heading, .refund-form label:has(textarea) { grid-column: 1 / -1; }
+.refund-form .payment-form-heading { display: grid; gap: 3px; }
+.refund-form .payment-form-heading span { color: var(--ds-text-secondary); font-size: 13px; }
+.refund-form textarea { min-height: 96px; }
+.refund-form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 9px; }
+
+/* Settings, register, attendance, payroll and reports share the same grid rhythm. */
+.register-grid, .settings-grid, .report-panels, .menu-columns, .dashboard-panels { gap: 16px; }
+.register-metrics, .report-metrics, .dashboard-metrics { gap: 14px; }
+.register-metrics > div { padding: 15px; border-radius: 12px; }
+.register-metrics span, .report-row { font-size: 13px; line-height: 1.45; }
+.register-metrics strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.register-ticket-list > div > span { min-width: 0; overflow-wrap: anywhere; }
+.register-ticket-list > div > b { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.report-row { padding: 10px 0; }
+.attendance-day-row, .attendance-day-rows, .attendance-log-list { font-size: 14px; }
+.module-row { padding-block: 17px; }
+.module-row strong { font-size: 15px; }
+.module-row p, .module-row small { font-size: 13px; line-height: 1.5; }
+.payroll-review-card, .payroll-history-row, .payroll-preview-row { border-radius: 12px; }
+.payroll-history-row, .payroll-preview-row { padding: 12px 14px; }
+.receipt-paper { line-height: 1.45; }
+.receipt-paper small { font-size: 11px; }
+.signin-card { border-radius: 20px; box-shadow: var(--ds-shadow-card); }
+
+@media (max-width: 1100px) {
+  .sidebar { width: 220px; }
+  .main { margin-left: 220px; }
+  .pos-layout { grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); }
+}
+@media (max-width: 1000px) {
+  .sidebar { width: min(300px, 86vw); }
+  .main { margin-left: 0; }
+  .topbar { min-height: 74px; padding: 12px 20px; }
+  .mobile-menu { width: 44px; height: 44px; }
+  .pos-layout { grid-template-columns: minmax(0, 1fr) minmax(310px, 40vw); }
+}
+@media (max-width: 700px) {
+  body { font-size: 15px; }
+  .topbar { min-height: 68px; padding: 10px 14px; gap: 9px; }
+  .topbar h1 { font-size: 23px; }
+  .topbar .eyebrow { font-size: 9px; }
+  .topbar-right { gap: 7px; }
+  .role-pill { min-height: 32px; padding: 5px 9px; font-size: 11px; }
+  .page-pad, .pos-menu { padding: 18px 14px 32px; }
+  .sample-banner { padding: 9px 14px; font-size: 12px; }
+  .page-heading { align-items: stretch; flex-direction: column; gap: 12px; }
+  .page-heading .segmented { align-self: flex-start; }
+  .toolbar { align-items: stretch; flex-direction: column; }
+  .toolbar > *, .toolbar .search-box { width: 100%; min-width: 0; }
+  .metric-grid { gap: 10px; }
+  .metric { padding: 14px; }
+  .metric strong { font-size: 19px; }
+  .pos-layout { display: flex; flex-direction: column; }
+  .pos-menu { order: 1; }
+  .cart-panel { order: 2; position: relative; top: auto; max-height: none; border-top: 1px solid var(--line); border-left: 0; }
+  .cart-scroll { overflow: visible; }
+  .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .item-art { height: clamp(86px, 26vw, 124px); }
+  .item-content { padding: 11px; }
+  .item-content strong { font-size: 14px; }
+  .item-content p { display: none; }
+  .item-add { width: 42px; height: 42px; }
+  .order-status-nav { position: sticky; top: calc(4px + env(safe-area-inset-top)); z-index: 4; margin-inline: 0; overflow-x: auto; }
+  .order-status-nav button { min-height: 44px; flex: none; }
+  .order-status-lane { width: 100%; }
+  .order-status-lane-cards .ticket-card { padding: 16px; }
+  .order-list-row { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+  .order-list-columns { display: none; }
+  .order-list-action { text-align: left; }
+  .surface, .form-surface { padding: 16px; }
+  .table-wrap { overflow-x: auto; }
+  .modal-backdrop { align-items: stretch; padding: 6px; }
+  .modal { width: 100%; max-height: calc(100dvh - 12px); border-radius: 16px; }
+  .modal-head { min-height: 58px; padding: 13px 17px; }
+  .modal-body { padding: 17px; }
+  .modal-actions { gap: 8px; padding: 10px 17px calc(12px + env(safe-area-inset-bottom)); }
+  .modal:has(.detail-grid) { width: 100%; max-height: calc(100dvh - 12px); }
+  .modal:has(.detail-grid) .modal-head { padding: 13px 17px; }
+  .modal:has(.detail-grid) .modal-body { padding: 17px; }
+  .modal:has(.detail-grid) .detail-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .modal:has(.detail-grid) .detail-grid p, .modal:has(.detail-grid) .detail-grid small { font-size: 14px; }
+  .modal:has(.detail-grid) .detail-line { font-size: 14px; }
+  .modal:has(.detail-grid) .detail-actions button { min-height: 44px; }
+  .refund-summary { align-items: flex-start; flex-direction: column; }
+  .refund-toggle { width: 100%; }
+  .refund-form { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+  .refund-form .payment-form-heading, .refund-form label:has(textarea), .refund-form-actions { grid-column: 1; }
+  .refund-form-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .refund-form-actions button { min-height: 44px; }
+  .register-grid, .register-movement-grid { grid-template-columns: minmax(0, 1fr); }
+  .settings-grid, .report-panels, .menu-columns, .dashboard-panels { grid-template-columns: minmax(0, 1fr); }
+  .register-metrics, .payment-preview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .attendance-calendar-main { overflow-x: auto; }
+  .toast { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); min-width: 0; max-width: calc(100vw - 24px); }
+}
+@media (max-width: 420px) {
+  .topbar .connection-state { display: none; }
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .register-metrics, .payment-preview { grid-template-columns: minmax(0, 1fr); }
+  .modal-actions > button { flex: 1 1 auto; }
+  .refund-form-actions { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
